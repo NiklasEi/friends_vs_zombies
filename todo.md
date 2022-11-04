@@ -1,0 +1,2 @@
+- room names
+- display players in matchmaking and their ready status
