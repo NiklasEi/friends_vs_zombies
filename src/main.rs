@@ -2,7 +2,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![allow(clippy::type_complexity)]
 
-use std::io::Cursor;
 use crate::loading::{ImageAssets, LoadingPlugin};
 use crate::matchmaking::MatchmakingPlugin;
 use crate::menu::MenuPlugin;
@@ -11,8 +10,9 @@ use crate::players::{BulletReady, LocalPlayerId, MoveDir, Player, PlayersPlugin}
 use bevy::prelude::*;
 use bevy::window::WindowId;
 use bevy::winit::WinitWindows;
-use winit::window::Icon;
 use input::*;
+use std::io::Cursor;
+use winit::window::Icon;
 
 mod input;
 mod loading;
@@ -69,7 +69,9 @@ enum GameMode {
 // Sets the icon on windows and X11
 fn set_window_icon(windows: NonSend<WinitWindows>) {
     let primary = windows.get_window(WindowId::primary()).unwrap();
-    let icon_buf = Cursor::new(include_bytes!("../build/macos/AppIcon.iconset/icon_256x256.png"));
+    let icon_buf = Cursor::new(include_bytes!(
+        "../build/macos/AppIcon.iconset/icon_256x256.png"
+    ));
     if let Ok(image) = image::load(icon_buf, image::ImageFormat::Png) {
         let image = image.into_rgba8();
         let (width, height) = image.dimensions();
