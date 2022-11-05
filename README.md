@@ -7,3 +7,7 @@ Currently broken in Firefox, but works in single and multiplayer mode in Chrome.
 ## Local dev in the browser
 
 `cargo watch -cx "run --release --target wasm32-unknown-unknown --config 'target.wasm32-unknown-unknown.runner = \"wasm-server-runner\"'"`
+
+## Deployed dev build (might be outdated)
+
+https://niklasei.github.io/bevy_boxhead/
