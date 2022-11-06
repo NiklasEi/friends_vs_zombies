@@ -23,15 +23,9 @@ fn spawn_player_list(mut commands: Commands) {
     commands
         .spawn_bundle(NodeBundle {
             style: Style {
-                size: Size::new(Val::Px(150.0), Val::Px(50.0)),
-                position_type: PositionType::Absolute,
+                position_type: PositionType::Relative,
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                position: UiRect {
-                    right: Val::Px(10.),
-                    top: Val::Px(10.),
-                    ..Default::default()
-                },
                 ..Default::default()
             },
             color: UiColor(Color::NONE),
