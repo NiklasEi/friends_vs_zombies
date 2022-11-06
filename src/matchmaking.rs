@@ -55,7 +55,7 @@ fn setup(mut commands: Commands) {
 }
 
 fn start_matchbox_socket(mut commands: Commands) {
-    let room_url = "wss://match.nikl.me:3536/bevy_boxhead";
+    let room_url = "wss://match.nikl.me/bevy_boxhead";
     info!("connecting to matchbox server: {:?}", room_url);
     let (socket, message_loop) = WebRtcSocket::new(room_url);
 
