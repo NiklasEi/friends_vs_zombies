@@ -7,6 +7,7 @@ use crate::matchmaking::MatchmakingPlugin;
 use crate::menu::MenuPlugin;
 use crate::networking::{GgrsConfig, InterludeTimer, NetworkingPlugin};
 use crate::players::{BulletReady, LocalPlayerId, MoveDir, Player, PlayersPlugin};
+use crate::ui::UiPlugin;
 use bevy::prelude::*;
 use bevy::window::WindowId;
 use bevy::winit::WinitWindows;
@@ -20,6 +21,7 @@ mod matchmaking;
 mod menu;
 mod networking;
 mod players;
+mod ui;
 
 const PLAYER_RADIUS: f32 = 0.5;
 const BULLET_RADIUS: f32 = 0.025;
@@ -57,6 +59,7 @@ fn main() {
         .add_plugin(NetworkingPlugin)
         .add_plugin(MatchmakingPlugin)
         .add_plugin(MenuPlugin)
+        .add_plugin(UiPlugin)
         .run();
 }
 

@@ -9,6 +9,10 @@ ggrs = "0.9"
 bevy_ggrs = { version = "0.10", features = ["wasm-bindgen"] }
 matchbox_socket = { version = "0.4", features = ["ggrs-socket"] }
 bevy_asset_loader = "0.12"
+bevy_common_assets = {version = "0.3", features = ["json"]}
+serde = "1"
+rand = "=0.8.5"
+rand_chacha = "=0.3.1"
 
 # keep the following in sync with Bevy's dependencies
 winit = { version = "0.26.0", default-features = false }
