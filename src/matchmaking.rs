@@ -10,15 +10,17 @@ pub struct MatchmakingPlugin;
 
 impl Plugin for MatchmakingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<NewPlayerEvent>()
-            .init_resource::<RemotePlayers>()
+        app.init_resource::<RemotePlayers>()
+            .init_resource::<PlayerReady>()
             .add_system_set(
                 SystemSet::on_enter(GameState::Matchmaking)
                     .with_system(start_matchbox_socket)
                     .with_system(setup),
             )
             .add_system_set(
-                SystemSet::on_update(GameState::Matchmaking).with_system(wait_for_players),
+                SystemSet::on_update(GameState::Matchmaking)
+                    .with_system(wait_for_players)
+                    .with_system(send_ready_message),
             );
     }
 }
@@ -59,11 +61,36 @@ fn setup(mut commands: Commands) {
     }
 }
 
+fn send_ready_message(
+    ready_state: Res<PlayerReady>,
+    mut socket: ResMut<Option<WebRtcSocket>>,
+    mut players: ResMut<RemotePlayers>,
+) {
+    if ready_state.is_changed() && ready_state.0 {
+        let Some(socket) = socket.as_mut() else {
+            return;
+        };
+        players
+            .0
+            .iter_mut()
+            .find(|player| &player.id == socket.id())
+            .unwrap()
+            .ready = true;
+        let packet = Box::new([1]);
+        let socket_players = socket.players();
+        for player in socket_players {
+            if let PlayerType::Remote(id) = player {
+                socket.send(packet.clone(), id);
+            }
+        }
+    }
+}
+
 fn start_matchbox_socket(
     mut commands: Commands,
     game_data: Res<GameData>,
     player_names: Res<Assets<PlayerNames>>,
-    mut new_player_events: EventWriter<NewPlayerEvent>,
+    mut players: ResMut<RemotePlayers>,
 ) {
     let room_url = "wss://match.nikl.me/bevy_boxhead";
     info!("connecting to matchbox server: {:?}", room_url);
@@ -74,24 +101,30 @@ fn start_matchbox_socket(
     IoTaskPool::get().spawn(message_loop).detach();
 
     let player_names = player_names.get(&game_data.player_names).unwrap();
-    let new_player = RemotePlayer {
-        name: format!("{} (you)", player_names.get_name_from_id(socket.id())),
+    let local_player = SocketPlayer {
+        name: format!("{}", player_names.get_name_from_id(socket.id())),
         id: socket.id().clone(),
+        ready: false,
     };
-    new_player_events.send(NewPlayerEvent(new_player));
+    commands.insert_resource(LocalPlayer(local_player.clone()));
+    players.0.push(local_player);
 
     commands.insert_resource(Some(socket));
 }
 
 #[derive(Default, Debug)]
-pub struct RemotePlayers(Vec<RemotePlayer>);
+pub struct RemotePlayers(pub Vec<SocketPlayer>);
 
-pub struct NewPlayerEvent(pub RemotePlayer);
+pub struct LocalPlayer(pub SocketPlayer);
+
+#[derive(Default)]
+pub struct PlayerReady(pub bool);
 
 #[derive(Debug, Clone)]
-pub struct RemotePlayer {
+pub struct SocketPlayer {
     pub id: String,
     pub name: String,
+    pub ready: bool,
 }
 
 fn wait_for_players(
@@ -104,28 +137,49 @@ fn wait_for_players(
     mut players: ResMut<RemotePlayers>,
     game_data: Res<GameData>,
     player_names: Res<Assets<PlayerNames>>,
-    mut new_player_events: EventWriter<NewPlayerEvent>,
 ) {
-    let socket = socket.as_mut();
-
     // If there is no socket we've already started the game
-    if socket.is_none() {
+    let Some(socket) = socket.as_mut() else {
         return;
-    }
+    };
 
     // Check for new connections
-    let mut new_players = socket.as_mut().unwrap().accept_new_connections();
-    let socket_players = socket.as_ref().unwrap().players();
+    let mut new_players = socket.accept_new_connections();
+    let socket_players = socket.players();
+    let local_id = socket.id().clone();
+    let mut packets = socket.receive();
+    packets.drain(..).for_each(|(peer, packet)| {
+        info!("{} sent {}", peer, packet.first().unwrap());
+        players
+            .0
+            .iter_mut()
+            .find(|player| player.id == peer)
+            .unwrap()
+            .ready = true;
+    });
+    players.0.retain(|player| {
+        player.id == local_id
+            || socket_players
+                .iter()
+                .find(|socket_player| {
+                    if let PlayerType::Remote(id) = socket_player {
+                        id == &player.id
+                    } else {
+                        false
+                    }
+                })
+                .is_some()
+    });
 
     for player in new_players.drain(..) {
         info!("Player {} connected", player);
         let player_names = player_names.get(&game_data.player_names).unwrap();
-        let new_player = RemotePlayer {
+        let new_player = SocketPlayer {
             name: player_names.get_name_from_id(&player),
             id: player,
+            ready: false,
         };
         players.0.push(new_player.clone());
-        new_player_events.send(NewPlayerEvent(new_player));
     }
 
     if *game_mode == GameMode::Multi && !input.pressed(KeyCode::NumpadEnter) {
@@ -158,17 +212,17 @@ fn wait_for_players(
             .expect("failed to add player");
     }
 
-    // move the socket out of the resource (required because GGRS takes ownership of it)
-    let socket = socket.take().unwrap();
-
-    // start the GGRS session
-    let session = session_builder
-        .start_p2p_session(socket)
-        .expect("failed to start session");
-
-    commands.insert_resource(session);
-    commands.insert_resource(SessionType::P2PSession);
-
-    interlude_timer.0 = 3;
-    state.set(GameState::Interlude).unwrap();
+    // // move the socket out of the resource (required because GGRS takes ownership of it)
+    // let socket = socket.take().unwrap();
+    //
+    // // start the GGRS session
+    // let session = session_builder
+    //     .start_p2p_session(socket)
+    //     .expect("failed to start session");
+    //
+    // commands.insert_resource(session);
+    // commands.insert_resource(SessionType::P2PSession);
+    //
+    // interlude_timer.0 = 3;
+    // state.set(GameState::Interlude).unwrap();
 }

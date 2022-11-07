@@ -18,9 +18,10 @@ impl Plugin for MenuPlugin {
     }
 }
 
-struct ButtonColors {
-    normal: UiColor,
-    hovered: UiColor,
+pub struct ButtonColors {
+    pub normal: UiColor,
+    pub hovered: UiColor,
+    pub selected: UiColor,
 }
 
 impl Default for ButtonColors {
@@ -28,6 +29,7 @@ impl Default for ButtonColors {
         ButtonColors {
             normal: Color::rgb(0.15, 0.15, 0.15).into(),
             hovered: Color::rgb(0.25, 0.25, 0.25).into(),
+            selected: Color::rgb(0.55, 0.55, 0.55).into(),
         }
     }
 }
@@ -49,7 +51,7 @@ fn setup_menu(
     commands
         .spawn_bundle(ButtonBundle {
             style: Style {
-                size: Size::new(Val::Px(120.0), Val::Px(50.0)),
+                size: Size::new(Val::Px(250.0), Val::Px(50.0)),
                 margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
@@ -70,7 +72,7 @@ fn setup_menu(
                             color: Color::rgb(0.9, 0.9, 0.9),
                         },
                     }],
-                    alignment: Default::default(),
+                    alignment: TextAlignment::CENTER,
                 },
                 ..Default::default()
             });
@@ -78,7 +80,7 @@ fn setup_menu(
     commands
         .spawn_bundle(ButtonBundle {
             style: Style {
-                size: Size::new(Val::Px(120.0), Val::Px(50.0)),
+                size: Size::new(Val::Px(250.0), Val::Px(50.0)),
                 margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
@@ -99,7 +101,7 @@ fn setup_menu(
                             color: Color::rgb(0.9, 0.9, 0.9),
                         },
                     }],
-                    alignment: Default::default(),
+                    alignment: TextAlignment::CENTER,
                 },
                 ..Default::default()
             });
