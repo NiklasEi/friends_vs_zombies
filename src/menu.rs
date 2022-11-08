@@ -169,21 +169,35 @@ fn setup_menu(
                     });
                 });
             parent
-                .spawn_bundle(TextBundle {
-                    text: Text {
-                        sections: vec![TextSection {
-                            value: "Code: ______".to_owned(),
-                            style: TextStyle {
-                                font: font_assets.fira_sans.clone(),
-                                font_size: 40.0,
-                                color: Color::rgb(0.9, 0.9, 0.9),
-                            },
-                        }],
-                        alignment: TextAlignment::CENTER,
+                .spawn_bundle(NodeBundle {
+                    style: Style {
+                        size: Size::new(Val::Px(250.0), Val::Px(50.0)),
+                        margin: UiRect::all(Val::Auto),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..Default::default()
                     },
+                    color: UiColor(Color::NONE),
                     ..Default::default()
                 })
-                .insert(CodeDisplay);
+                .with_children(|parent| {
+                    parent
+                        .spawn_bundle(TextBundle {
+                            text: Text {
+                                sections: vec![TextSection {
+                                    value: "Code: ______".to_owned(),
+                                    style: TextStyle {
+                                        font: font_assets.fira_sans.clone(),
+                                        font_size: 40.0,
+                                        color: Color::rgb(0.9, 0.9, 0.9),
+                                    },
+                                }],
+                                alignment: TextAlignment::CENTER,
+                            },
+                            ..Default::default()
+                        })
+                        .insert(CodeDisplay);
+                });
             parent
                 .spawn_bundle(ButtonBundle {
                     style: Style {
@@ -230,6 +244,7 @@ fn click_singleplayer_button(
             Interaction::Clicked => {
                 state.set(GameState::Matchmaking).unwrap();
                 commands.insert_resource(GameMode::Single);
+                commands.insert_resource(GameCode(build_game_code()));
             }
             Interaction::Hovered => {
                 *color = button_colors.hovered;

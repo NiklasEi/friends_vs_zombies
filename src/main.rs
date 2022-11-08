@@ -3,6 +3,7 @@
 #![allow(clippy::type_complexity)]
 
 use crate::loading::{ImageAssets, LoadingPlugin};
+use crate::map::MapPlugin;
 use crate::matchmaking::MatchmakingPlugin;
 use crate::menu::MenuPlugin;
 use crate::networking::{GgrsConfig, InterludeTimer, NetworkingPlugin};
@@ -17,6 +18,7 @@ use winit::window::Icon;
 
 mod input;
 mod loading;
+mod map;
 mod matchmaking;
 mod menu;
 mod networking;
@@ -59,6 +61,7 @@ fn main() {
         .add_plugin(MatchmakingPlugin)
         .add_plugin(MenuPlugin)
         .add_plugin(UiPlugin)
+        .add_plugin(MapPlugin)
         .run();
 }
 

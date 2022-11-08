@@ -1,7 +1,7 @@
 use crate::loading::FontAssets;
-use crate::matchmaking::{LocalPlayer, PlayerReady, RemotePlayers};
+use crate::matchmaking::{LocalPlayer, RemotePlayers, StartGame};
 use crate::menu::{ButtonColors, GameCode};
-use crate::GameState;
+use crate::{GameMode, GameState};
 use bevy::prelude::*;
 
 pub struct UiPlugin;
@@ -11,12 +11,15 @@ impl Plugin for UiPlugin {
         app.add_system_set(
             SystemSet::on_enter(GameState::Matchmaking)
                 .with_system(spawn_player_list)
-                .with_system(spawn_ready_button),
+                .with_system(prepare_matchmaking_ui),
         )
         .add_system_set(
             SystemSet::on_update(GameState::Matchmaking)
                 .with_system(update_player_list)
-                .with_system(click_ready_button),
+                .with_system(click_start_button),
+        )
+        .add_system_set(
+            SystemSet::on_exit(GameState::Matchmaking).with_system(remove_matchmaking_only_ui),
         );
     }
 }
@@ -28,7 +31,11 @@ fn spawn_player_list(mut commands: Commands) {
     commands
         .spawn_bundle(NodeBundle {
             style: Style {
-                position_type: PositionType::Relative,
+                position_type: PositionType::Absolute,
+                position: UiRect {
+                    left: Val::Px(5.),
+                    ..default()
+                },
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 ..Default::default()
@@ -50,32 +57,56 @@ fn spawn_player_list(mut commands: Commands) {
 }
 
 #[derive(Component)]
-struct ReadyButton;
+struct MatchmakingOnly;
 
-fn spawn_ready_button(
+#[derive(Component)]
+struct StartButton;
+
+fn prepare_matchmaking_ui(
     mut commands: Commands,
     font_assets: Res<FontAssets>,
+    game_mode: Res<GameMode>,
     game_code: Res<GameCode>,
     button_colors: Res<ButtonColors>,
 ) {
-    commands
-        .spawn_bundle(ButtonBundle {
-            style: Style {
-                size: Size::new(Val::Px(120.0), Val::Px(50.0)),
-                margin: UiRect::all(Val::Auto),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
+    if *game_mode == GameMode::Multi(true) {
+        commands
+            .spawn_bundle(ButtonBundle {
+                style: Style {
+                    size: Size::new(Val::Px(120.0), Val::Px(50.0)),
+                    margin: UiRect::all(Val::Auto),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    ..Default::default()
+                },
+                color: button_colors.normal,
                 ..Default::default()
-            },
-            color: button_colors.normal,
-            ..Default::default()
-        })
-        .insert(ReadyButton)
-        .with_children(|parent| {
-            parent.spawn_bundle(TextBundle {
+            })
+            .insert(StartButton)
+            .insert(MatchmakingOnly)
+            .with_children(|parent| {
+                parent.spawn_bundle(TextBundle {
+                    text: Text {
+                        sections: vec![TextSection {
+                            value: "Start".to_string(),
+                            style: TextStyle {
+                                font: font_assets.fira_sans.clone(),
+                                font_size: 40.0,
+                                color: Color::rgb(0.9, 0.9, 0.9),
+                            },
+                        }],
+                        alignment: TextAlignment::CENTER,
+                    },
+                    ..Default::default()
+                });
+            });
+    } else {
+        commands
+            .spawn_bundle(TextBundle {
                 text: Text {
                     sections: vec![TextSection {
-                        value: "Ready".to_string(),
+                        value: "One player has a start button, wait for them to press it"
+                            .to_owned(),
                         style: TextStyle {
                             font: font_assets.fira_sans.clone(),
                             font_size: 40.0,
@@ -85,40 +116,49 @@ fn spawn_ready_button(
                     alignment: TextAlignment::CENTER,
                 },
                 ..Default::default()
-            });
-        });
+            })
+            .insert(MatchmakingOnly);
+    }
 
-    commands.spawn_bundle(TextBundle {
-        text: Text {
-            sections: vec![TextSection {
-                value: format!("Game code: {}", game_code.0),
-                style: TextStyle {
-                    font: font_assets.fira_sans.clone(),
-                    font_size: 40.0,
-                    color: Color::rgb(0.9, 0.9, 0.9),
-                },
-            }],
-            alignment: TextAlignment::CENTER,
-        },
-        ..Default::default()
-    });
+    commands
+        .spawn_bundle(TextBundle {
+            text: Text {
+                sections: vec![TextSection {
+                    value: format!("Game code: {}", game_code.0),
+                    style: TextStyle {
+                        font: font_assets.fira_sans.clone(),
+                        font_size: 40.0,
+                        color: Color::rgb(0.9, 0.9, 0.9),
+                    },
+                }],
+                alignment: TextAlignment::CENTER,
+            },
+            ..Default::default()
+        })
+        .insert(MatchmakingOnly);
 }
 
-fn click_ready_button(
+fn remove_matchmaking_only_ui(mut commands: Commands, ui: Query<Entity, With<MatchmakingOnly>>) {
+    for entity in &ui {
+        commands.entity(entity).despawn_recursive();
+    }
+}
+
+fn click_start_button(
     button_colors: Res<ButtonColors>,
-    mut ready_state: ResMut<PlayerReady>,
+    mut start_game: ResMut<StartGame>,
     mut interaction_query: Query<
         (&Interaction, &mut UiColor),
-        (Changed<Interaction>, With<ReadyButton>),
+        (Changed<Interaction>, With<StartButton>),
     >,
 ) {
-    if ready_state.0 {
+    if start_game.0 {
         return;
     }
     for (interaction, mut color) in &mut interaction_query {
         match *interaction {
             Interaction::Clicked => {
-                ready_state.0 = true;
+                start_game.0 = true;
                 *color = button_colors.selected;
             }
             Interaction::Hovered => {
@@ -146,7 +186,7 @@ fn update_player_list(
                 player.name.clone()
             };
             list.single_mut().sections.push(TextSection {
-                value: format!("{} {}\n", name, player.ready),
+                value: format!("{}\n", name),
                 style: TextStyle {
                     font: font_assets.fira_sans.clone(),
                     font_size: 20.0,
