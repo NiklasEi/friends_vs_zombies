@@ -39,7 +39,6 @@ enum GameState {
 
 #[derive(Component, Reflect, Default)]
 pub struct Bullet;
-
 fn main() {
     let mut app = App::new();
 
@@ -66,7 +65,7 @@ fn main() {
 #[derive(PartialEq, Eq, Debug)]
 enum GameMode {
     Single,
-    Multi,
+    Multi(bool),
 }
 
 // Sets the icon on windows and X11

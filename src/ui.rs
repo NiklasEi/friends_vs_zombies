@@ -1,6 +1,6 @@
 use crate::loading::FontAssets;
 use crate::matchmaking::{LocalPlayer, PlayerReady, RemotePlayers};
-use crate::menu::ButtonColors;
+use crate::menu::{ButtonColors, GameCode};
 use crate::GameState;
 use bevy::prelude::*;
 
@@ -55,6 +55,7 @@ struct ReadyButton;
 fn spawn_ready_button(
     mut commands: Commands,
     font_assets: Res<FontAssets>,
+    game_code: Res<GameCode>,
     button_colors: Res<ButtonColors>,
 ) {
     commands
@@ -86,6 +87,21 @@ fn spawn_ready_button(
                 ..Default::default()
             });
         });
+
+    commands.spawn_bundle(TextBundle {
+        text: Text {
+            sections: vec![TextSection {
+                value: format!("Game code: {}", game_code.0),
+                style: TextStyle {
+                    font: font_assets.fira_sans.clone(),
+                    font_size: 40.0,
+                    color: Color::rgb(0.9, 0.9, 0.9),
+                },
+            }],
+            alignment: TextAlignment::CENTER,
+        },
+        ..Default::default()
+    });
 }
 
 fn click_ready_button(
