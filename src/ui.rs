@@ -123,22 +123,35 @@ fn prepare_matchmaking_ui(
                     });
             } else if *game_mode == GameMode::Multi(false) {
                 parent
-                    .spawn_bundle(TextBundle {
-                        text: Text {
-                            sections: vec![TextSection {
-                                value: "One player has a start button, wait for them to press it"
-                                    .to_owned(),
-                                style: TextStyle {
-                                    font: font_assets.fira_sans.clone(),
-                                    font_size: 40.0,
-                                    color: Color::rgb(0.9, 0.9, 0.9),
-                                },
-                            }],
-                            alignment: TextAlignment::CENTER,
+                    .spawn_bundle(NodeBundle {
+                        style: Style {
+                            margin: UiRect::all(Val::Auto),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..Default::default()
                         },
+                        color: UiColor(Color::NONE),
                         ..Default::default()
                     })
-                    .insert(MatchmakingOnly);
+                    .insert(MatchmakingOnly)
+                    .with_children(|parent| {
+                        parent.spawn_bundle(TextBundle {
+                            text: Text {
+                                sections: vec![TextSection {
+                                    value:
+                                        "One player has a start button,\nwait for them to press it"
+                                            .to_owned(),
+                                    style: TextStyle {
+                                        font: font_assets.fira_sans.clone(),
+                                        font_size: 40.0,
+                                        color: Color::rgb(0.9, 0.9, 0.9),
+                                    },
+                                }],
+                                alignment: TextAlignment::CENTER,
+                            },
+                            ..Default::default()
+                        });
+                    });
             }
 
             parent

@@ -15,8 +15,8 @@ impl Plugin for MenuPlugin {
                 SystemSet::on_update(GameState::Menu)
                     .with_system(click_singleplayer_button)
                     .with_system(click_create_game_button)
-                    .with_system(click_join_game_button)
-                    .with_system(listen_for_game_code),
+                    .with_system(listen_for_game_code)
+                    .with_system(click_join_game_button.after(listen_for_game_code)),
             )
             .add_system_set(SystemSet::on_exit(GameState::Menu).with_system(cleanup_menu));
     }
@@ -325,6 +325,8 @@ fn listen_for_game_code(
     mut code: Query<&mut Text, With<CodeDisplay>>,
     input: Res<Input<KeyCode>>,
     mut game_code: ResMut<GameCode>,
+    button_colors: Res<ButtonColors>,
+    mut join_button: Query<&mut UiColor, With<JoinGameButton>>,
 ) {
     if input.just_pressed(KeyCode::Back) {
         game_code.0.pop();
@@ -337,7 +339,10 @@ fn listen_for_game_code(
         }
     });
     code.single_mut().sections[0].value =
-        format!("Code: {}{}", game_code.0, "_".repeat(6 - game_code.0.len()))
+        format!("Code: {}{}", game_code.0, "_".repeat(6 - game_code.0.len()));
+    if game_code.0.len() == 6 {
+        *join_button.single_mut() = button_colors.normal;
+    }
 }
 
 fn click_join_game_button(
@@ -345,12 +350,15 @@ fn click_join_game_button(
     button_colors: Res<ButtonColors>,
     game_code: Res<GameCode>,
     mut state: ResMut<State<GameState>>,
-    mut interaction_query: Query<
-        (&Interaction, &mut UiColor),
-        (Changed<Interaction>, With<JoinGameButton>),
-    >,
+    input: Res<Input<KeyCode>>,
+    mut interaction_query: Query<(&Interaction, &mut UiColor), With<JoinGameButton>>,
 ) {
     if game_code.0.len() < 6 {
+        return;
+    }
+    if input.just_pressed(KeyCode::Return) {
+        state.set(GameState::Matchmaking).unwrap();
+        commands.insert_resource(GameMode::Multi(false));
         return;
     }
     for (interaction, mut color) in &mut interaction_query {
