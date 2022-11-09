@@ -1,3 +1,4 @@
+use crate::players::PlayerColors;
 use crate::{
     direction, fire, game_input, Bullet, BulletReady, GameState, ImageAssets, MoveDir, Player,
     BULLET_RADIUS, MAP_SIZE, PLAYER_RADIUS,
@@ -76,6 +77,7 @@ fn interlude_timer(mut timer: ResMut<InterludeTimer>, mut state: ResMut<State<Ga
 pub fn spawn_players(
     mut commands: Commands,
     mut rollback_id_provider: ResMut<RollbackIdProvider>,
+    player_colors: Res<PlayerColors>,
     session: Res<P2PSession<GgrsConfig>>,
 ) {
     info!("Spawning players");
@@ -85,7 +87,7 @@ pub fn spawn_players(
             .spawn_bundle(SpriteBundle {
                 transform: Transform::from_translation(Vec3::new(0., 0., 100.)),
                 sprite: Sprite {
-                    color: Color::rgb(0., player as f32, 1.),
+                    color: player_colors.0[player % player_colors.0.len()],
                     custom_size: Some(Vec2::new(1., 1.)),
                     ..default()
                 },

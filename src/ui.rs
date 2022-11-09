@@ -32,20 +32,27 @@ fn spawn_player_list(mut commands: Commands) {
         .spawn_bundle(NodeBundle {
             style: Style {
                 position_type: PositionType::Absolute,
-                position: UiRect {
-                    left: Val::Px(5.),
-                    ..default()
+                size: Size {
+                    width: Val::Percent(100.),
+                    height: Val::Percent(100.),
                 },
-                justify_content: JustifyContent::Center,
+                justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::Center,
                 ..Default::default()
             },
-            color: UiColor(Color::GOLD),
+            color: UiColor(Color::NONE),
             ..default()
         })
         .with_children(|parent| {
             parent
                 .spawn_bundle(TextBundle {
+                    style: Style {
+                        margin: UiRect {
+                            left: Val::Px(5.),
+                            ..default()
+                        },
+                        ..default()
+                    },
                     text: Text {
                         sections: vec![],
                         alignment: Default::default(),
@@ -69,26 +76,85 @@ fn prepare_matchmaking_ui(
     game_code: Res<GameCode>,
     button_colors: Res<ButtonColors>,
 ) {
-    if *game_mode == GameMode::Multi(true) {
-        commands
-            .spawn_bundle(ButtonBundle {
-                style: Style {
-                    size: Size::new(Val::Px(120.0), Val::Px(50.0)),
-                    margin: UiRect::all(Val::Auto),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    ..Default::default()
+    commands
+        .spawn_bundle(NodeBundle {
+            style: Style {
+                size: Size {
+                    width: Val::Percent(100.),
+                    height: Val::Percent(100.),
                 },
-                color: button_colors.normal,
-                ..Default::default()
-            })
-            .insert(StartButton)
-            .insert(MatchmakingOnly)
-            .with_children(|parent| {
-                parent.spawn_bundle(TextBundle {
+                flex_direction: FlexDirection::ColumnReverse,
+                ..default()
+            },
+            color: UiColor(Color::NONE),
+            ..default()
+        })
+        .with_children(|parent| {
+            if *game_mode == GameMode::Multi(true) {
+                parent
+                    .spawn_bundle(ButtonBundle {
+                        style: Style {
+                            size: Size::new(Val::Px(120.0), Val::Px(50.0)),
+                            margin: UiRect::all(Val::Auto),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..Default::default()
+                        },
+                        color: button_colors.normal,
+                        ..Default::default()
+                    })
+                    .insert(StartButton)
+                    .insert(MatchmakingOnly)
+                    .with_children(|parent| {
+                        parent.spawn_bundle(TextBundle {
+                            text: Text {
+                                sections: vec![TextSection {
+                                    value: "Start".to_string(),
+                                    style: TextStyle {
+                                        font: font_assets.fira_sans.clone(),
+                                        font_size: 40.0,
+                                        color: Color::rgb(0.9, 0.9, 0.9),
+                                    },
+                                }],
+                                alignment: TextAlignment::CENTER,
+                            },
+                            ..Default::default()
+                        });
+                    });
+            } else if *game_mode == GameMode::Multi(false) {
+                parent
+                    .spawn_bundle(TextBundle {
+                        text: Text {
+                            sections: vec![TextSection {
+                                value: "One player has a start button, wait for them to press it"
+                                    .to_owned(),
+                                style: TextStyle {
+                                    font: font_assets.fira_sans.clone(),
+                                    font_size: 40.0,
+                                    color: Color::rgb(0.9, 0.9, 0.9),
+                                },
+                            }],
+                            alignment: TextAlignment::CENTER,
+                        },
+                        ..Default::default()
+                    })
+                    .insert(MatchmakingOnly);
+            }
+
+            parent
+                .spawn_bundle(TextBundle {
+                    style: Style {
+                        position_type: PositionType::Absolute,
+                        position: UiRect {
+                            top: Val::Px(15.),
+                            left: Val::Px(15.),
+                            ..default()
+                        },
+                        ..default()
+                    },
                     text: Text {
                         sections: vec![TextSection {
-                            value: "Start".to_string(),
+                            value: format!("Game code: {}", game_code.0),
                             style: TextStyle {
                                 font: font_assets.fira_sans.clone(),
                                 font_size: 40.0,
@@ -98,44 +164,9 @@ fn prepare_matchmaking_ui(
                         alignment: TextAlignment::CENTER,
                     },
                     ..Default::default()
-                });
-            });
-    } else {
-        commands
-            .spawn_bundle(TextBundle {
-                text: Text {
-                    sections: vec![TextSection {
-                        value: "One player has a start button, wait for them to press it"
-                            .to_owned(),
-                        style: TextStyle {
-                            font: font_assets.fira_sans.clone(),
-                            font_size: 40.0,
-                            color: Color::rgb(0.9, 0.9, 0.9),
-                        },
-                    }],
-                    alignment: TextAlignment::CENTER,
-                },
-                ..Default::default()
-            })
-            .insert(MatchmakingOnly);
-    }
-
-    commands
-        .spawn_bundle(TextBundle {
-            text: Text {
-                sections: vec![TextSection {
-                    value: format!("Game code: {}", game_code.0),
-                    style: TextStyle {
-                        font: font_assets.fira_sans.clone(),
-                        font_size: 40.0,
-                        color: Color::rgb(0.9, 0.9, 0.9),
-                    },
-                }],
-                alignment: TextAlignment::CENTER,
-            },
-            ..Default::default()
-        })
-        .insert(MatchmakingOnly);
+                })
+                .insert(MatchmakingOnly);
+        });
 }
 
 fn remove_matchmaking_only_ui(mut commands: Commands, ui: Query<Entity, With<MatchmakingOnly>>) {

@@ -67,7 +67,11 @@ pub struct SocketPlayer {
     pub name: String,
 }
 
-fn handle_packets(mut socket: ResMut<Option<WebRtcSocket>>, mut start_game: ResMut<StartGame>) {
+fn handle_packets(
+    mut socket: ResMut<Option<WebRtcSocket>>,
+    mut start_game: ResMut<StartGame>,
+    mut commands: Commands,
+) {
     let Some(socket) = socket.as_mut() else {
         return;
     };
@@ -76,7 +80,13 @@ fn handle_packets(mut socket: ResMut<Option<WebRtcSocket>>, mut start_game: ResM
         .drain(..)
         .for_each(|(_, packet)| match packet.first().unwrap() {
             &START => {
-                info!("let's go!");
+                let seed = Seed([
+                    *packet.get(1).unwrap_or(&0),
+                    *packet.get(2).unwrap_or(&0),
+                    *packet.get(3).unwrap_or(&0),
+                ]);
+                info!("let's go! {:?}", seed);
+                commands.insert_resource(seed);
                 start_game.0 = true;
             }
             _ => (),
@@ -89,7 +99,6 @@ fn wait_for_players(
     game_data: Res<GameData>,
     player_names: Res<Assets<PlayerNames>>,
 ) {
-    // If there is no socket we've already started the game
     let Some(socket) = socket.as_mut() else {
         return;
     };
@@ -123,6 +132,9 @@ fn wait_for_players(
     }
 }
 
+#[derive(Debug)]
+pub struct Seed(pub [u8; 3]);
+
 fn build_ggrs_session(
     mut commands: Commands,
     mut socket: ResMut<Option<WebRtcSocket>>,
@@ -141,7 +153,9 @@ fn build_ggrs_session(
     }
     if *game_mode == GameMode::Multi(true) {
         if input.pressed(KeyCode::Return) || start_game.0 {
-            let packet = Box::new([START]);
+            let seed = Seed([3, 4, 5]);
+            let packet = Box::new([START, seed.0[0], seed.0[1], seed.0[2]]);
+            commands.insert_resource(seed);
             let socket_players = socket.as_ref().as_ref().unwrap().players();
             for player in socket_players {
                 if let PlayerType::Remote(id) = player {
