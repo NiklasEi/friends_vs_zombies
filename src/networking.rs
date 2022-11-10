@@ -1,4 +1,6 @@
-use crate::players::PlayerColors;
+use crate::loading::{EnemyAssets, PlayerAssets};
+use crate::matchmaking::Seed;
+use crate::players::AnimationTimer;
 use crate::{
     direction, fire, game_input, Bullet, BulletReady, GameState, ImageAssets, MoveDir, Player,
     BULLET_RADIUS, MAP_SIZE, PLAYER_RADIUS,
@@ -7,11 +9,16 @@ use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
 use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider};
 use ggrs::{InputStatus, P2PSession};
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
+use std::time::Duration;
 
 pub struct NetworkingPlugin;
 
 impl Plugin for NetworkingPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<EnemyTimer>()
+            .init_resource::<SeedFrame>();
         GGRSPlugin::<GgrsConfig>::new()
             .with_input_system(game_input)
             .with_rollback_schedule(
@@ -34,10 +41,12 @@ impl Plugin for NetworkingPlugin {
                         )
                         .with_system_set(
                             SystemSet::on_update(GameState::InGame)
-                                .with_system(move_players)
-                                .with_system(reload_bullet)
+                                .with_system(advance_seed_frame)
+                                .with_system(spawn_enemies.after(advance_seed_frame))
+                                .with_system(move_players.after(advance_seed_frame))
+                                .with_system(reload_bullet.after(advance_seed_frame))
+                                .with_system(move_bullet.after(advance_seed_frame))
                                 .with_system(fire_bullets.after(move_players).after(reload_bullet))
-                                .with_system(move_bullet)
                                 .with_system(kill_players.after(move_bullet).after(move_players)),
                         ),
                 ),
@@ -45,6 +54,7 @@ impl Plugin for NetworkingPlugin {
             .register_rollback_type::<Transform>()
             .register_rollback_type::<BulletReady>()
             .register_rollback_type::<MoveDir>()
+            .register_rollback_type::<EnemyTimer>()
             .build(app);
     }
 }
@@ -77,22 +87,24 @@ fn interlude_timer(mut timer: ResMut<InterludeTimer>, mut state: ResMut<State<Ga
 pub fn spawn_players(
     mut commands: Commands,
     mut rollback_id_provider: ResMut<RollbackIdProvider>,
-    player_colors: Res<PlayerColors>,
+    player_assets: Res<PlayerAssets>,
     session: Res<P2PSession<GgrsConfig>>,
 ) {
     info!("Spawning players");
 
     for player in 0..session.num_players() {
         commands
-            .spawn_bundle(SpriteBundle {
-                transform: Transform::from_translation(Vec3::new(0., 0., 100.)),
-                sprite: Sprite {
-                    color: player_colors.0[player % player_colors.0.len()],
-                    custom_size: Some(Vec2::new(1., 1.)),
-                    ..default()
+            .spawn_bundle(SpriteSheetBundle {
+                transform: Transform {
+                    translation: Vec3::new(0., 0., 100.),
+                    scale: Vec3::splat(0.01),
+                    ..Default::default()
                 },
-                ..default()
+                sprite: TextureAtlasSprite::new(0),
+                texture_atlas: player_assets.player1.clone(),
+                ..Default::default()
             })
+            .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
             .insert(Player { handle: player })
             .insert(BulletReady(true))
             .insert(MoveDir(-Vec2::X))
@@ -135,14 +147,21 @@ fn kill_players(
 
 fn move_players(
     inputs: Res<Vec<(u8, InputStatus)>>,
-    mut player_query: Query<(&mut Transform, &mut MoveDir, &Player)>,
+    mut player_query: Query<(&mut Transform, &mut MoveDir, &Player, &mut AnimationTimer)>,
 ) {
-    for (mut transform, mut move_direction, player) in player_query.iter_mut() {
+    for (mut transform, mut move_direction, player, mut animation_timer) in player_query.iter_mut()
+    {
         let (input, _) = inputs[player.handle];
         let direction = direction(input);
 
         if direction == Vec2::ZERO {
+            info!("pause {}", player.handle);
+            animation_timer.0.pause();
             continue;
+        }
+        if animation_timer.0.paused() {
+            info!("unpause {}", player.handle);
+            animation_timer.0.unpause();
         }
 
         move_direction.0 = direction;
@@ -157,6 +176,68 @@ fn move_players(
         transform.translation.x = new_pos.x;
         transform.translation.y = new_pos.y;
     }
+}
+
+fn advance_seed_frame(mut frame: ResMut<SeedFrame>) {
+    frame.0 = frame.0.wrapping_add(1);
+}
+
+#[derive(Reflect, Component, Default)]
+struct SeedFrame(u16);
+
+#[derive(Reflect, Component)]
+struct EnemyTimer(Timer);
+
+impl Default for EnemyTimer {
+    fn default() -> Self {
+        Self(Timer::new(Duration::from_secs_f32(5.), true))
+    }
+}
+
+fn spawn_enemies(
+    mut commands: Commands,
+    seed: Res<Seed>,
+    enemy_assets: Res<EnemyAssets>,
+    seed_frame: Res<SeedFrame>,
+    mut enemy_timer: ResMut<EnemyTimer>,
+    mut rollback_id_provider: ResMut<RollbackIdProvider>,
+) {
+    enemy_timer.0.tick(Duration::from_secs_f32(1. / 60.));
+    if !enemy_timer.0.just_finished() {
+        return;
+    }
+    let seed: [u8; 32] = [
+        (seed_frame.0 >> 8) as u8,
+        seed_frame.0 as u8,
+        seed.0[1],
+        seed.0[2],
+    ]
+    .repeat(8)
+    .try_into()
+    .unwrap();
+    let mut rng = ChaCha8Rng::from_seed(seed);
+    // if !rng.gen_bool(0.02) {
+    //     return;
+    // }
+    let translation = Vec3::new(
+        rng.gen_range(0..MAP_SIZE) as f32 - MAP_SIZE as f32 / 2.,
+        rng.gen_range(0..MAP_SIZE) as f32 - MAP_SIZE as f32 / 2.,
+        100.,
+    );
+    info!("Spawning enemy at {:?}", translation);
+    commands
+        .spawn_bundle(SpriteSheetBundle {
+            transform: Transform {
+                translation,
+                scale: Vec3::splat(0.01),
+                ..Default::default()
+            },
+            sprite: TextureAtlasSprite::new(0),
+            texture_atlas: enemy_assets.enemy1.clone(),
+            ..Default::default()
+        })
+        .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
+        .insert(Rollback::new(rollback_id_provider.next_id()));
 }
 
 fn reload_bullet(

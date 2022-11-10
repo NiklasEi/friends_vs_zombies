@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![allow(clippy::type_complexity)]
 
+use crate::enemies::EnemiesPlugin;
 use crate::loading::{ImageAssets, LoadingPlugin};
 use crate::map::MapPlugin;
 use crate::matchmaking::MatchmakingPlugin;
@@ -16,6 +17,7 @@ use input::*;
 use std::io::Cursor;
 use winit::window::Icon;
 
+mod enemies;
 mod input;
 mod loading;
 mod map;
@@ -62,6 +64,7 @@ fn main() {
         .add_plugin(MenuPlugin)
         .add_plugin(UiPlugin)
         .add_plugin(MapPlugin)
+        .add_plugin(EnemiesPlugin)
         .run();
 }
 

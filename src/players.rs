@@ -5,8 +5,11 @@ pub struct PlayersPlugin;
 
 impl Plugin for PlayersPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PlayerColors>()
-            .add_system_set(SystemSet::on_update(GameState::InGame).with_system(camera_follow));
+        app.add_system_set(
+            SystemSet::on_update(GameState::InGame)
+                .with_system(camera_follow)
+                .with_system(animate_sprites),
+        );
     }
 }
 
@@ -15,21 +18,6 @@ pub struct LocalPlayerId(pub usize);
 #[derive(Component)]
 pub struct Player {
     pub handle: usize,
-}
-
-pub struct PlayerColors(pub(crate) Vec<Color>);
-
-impl Default for PlayerColors {
-    fn default() -> Self {
-        PlayerColors(vec![
-            Color::rgba_u8(255, 0, 0, 255),
-            Color::rgba_u8(0, 255, 0, 255),
-            Color::rgba_u8(0, 0, 255, 255),
-            Color::rgba_u8(0, 255, 255, 255),
-            Color::rgba_u8(255, 0, 255, 255),
-            Color::rgba_u8(255, 255, 0, 255),
-        ])
-    }
 }
 
 #[derive(Component, Reflect, Default)]
@@ -58,6 +46,25 @@ fn camera_follow(
         for mut transform in camera_query.iter_mut() {
             transform.translation.x = pos.x;
             transform.translation.y = pos.y;
+        }
+    }
+}
+
+#[derive(Component, Reflect, Default)]
+pub struct AnimationTimer(pub Timer, pub usize);
+
+fn animate_sprites(
+    time: Res<Time>,
+    mut query: Query<(&mut AnimationTimer, &mut TextureAtlasSprite)>,
+) {
+    for (mut timer, mut sprite) in &mut query {
+        if timer.0.paused() {
+            sprite.index = 0;
+            continue;
+        }
+        timer.0.tick(time.delta());
+        if timer.0.finished() {
+            sprite.index = (sprite.index + 1) % timer.1;
         }
     }
 }

@@ -16,6 +16,8 @@ impl Plugin for LoadingPlugin {
                     .with_collection::<ImageAssets>()
                     .with_collection::<FontAssets>()
                     .with_collection::<GameData>()
+                    .with_collection::<PlayerAssets>()
+                    .with_collection::<EnemyAssets>()
                     .continue_to_state(GameState::Menu),
             );
     }
@@ -31,6 +33,20 @@ pub struct GameData {
 pub struct ImageAssets {
     #[asset(path = "bullet.png")]
     pub bullet: Handle<Image>,
+}
+
+#[derive(AssetCollection)]
+pub struct PlayerAssets {
+    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
+    #[asset(path = "players/player1.png")]
+    pub player1: Handle<TextureAtlas>,
+}
+
+#[derive(AssetCollection)]
+pub struct EnemyAssets {
+    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
+    #[asset(path = "enemies/enemy1.png")]
+    pub enemy1: Handle<TextureAtlas>,
 }
 
 #[derive(AssetCollection)]
