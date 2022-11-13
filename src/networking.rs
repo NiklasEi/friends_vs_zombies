@@ -1,6 +1,7 @@
+use crate::enemies::{kill_enemies, move_enemies, Enemy};
 use crate::loading::{EnemyAssets, PlayerAssets};
 use crate::matchmaking::Seed;
-use crate::players::AnimationTimer;
+use crate::players::{AnimationTimer, Health};
 use crate::{
     direction, fire, game_input, Bullet, BulletReady, GameState, ImageAssets, MoveDir, Player,
     BULLET_RADIUS, MAP_SIZE, PLAYER_RADIUS,
@@ -46,8 +47,10 @@ impl Plugin for NetworkingPlugin {
                                 .with_system(move_players.after(advance_seed_frame))
                                 .with_system(reload_bullet.after(advance_seed_frame))
                                 .with_system(move_bullet.after(advance_seed_frame))
+                                .with_system(kill_enemies.after(move_bullet))
                                 .with_system(fire_bullets.after(move_players).after(reload_bullet))
-                                .with_system(kill_players.after(move_bullet).after(move_players)),
+                                .with_system(move_enemies.after(move_players))
+                                .with_system(kill_players.after(kill_enemies).after(move_players)),
                         ),
                 ),
             )
@@ -108,6 +111,7 @@ pub fn spawn_players(
             .insert(Player { handle: player })
             .insert(BulletReady(true))
             .insert(MoveDir(-Vec2::X))
+            .insert(Health::new(100.))
             .insert(Rollback::new(rollback_id_provider.next_id()));
     }
 }
@@ -128,16 +132,17 @@ fn remove_players(
 fn kill_players(
     mut commands: Commands,
     mut state: ResMut<State<GameState>>,
-    player_query: Query<(Entity, &Transform), (With<Player>, Without<Bullet>)>,
-    bullet_query: Query<&Transform, With<Bullet>>,
+    mut player_query: Query<(Entity, &Transform, &mut Health), (With<Player>, Without<Bullet>)>,
+    bullet_query: Query<(&Transform, &Bullet)>,
 ) {
-    for (player, player_transform) in player_query.iter() {
-        for bullet_transform in bullet_query.iter() {
+    for (player, player_transform, mut health) in player_query.iter_mut() {
+        for (bullet_transform, bullet) in bullet_query.iter() {
             let distance = Vec2::distance(
                 player_transform.translation.xy(),
                 bullet_transform.translation.xy(),
             );
             if distance < PLAYER_RADIUS + BULLET_RADIUS {
+                health.current -= bullet.damage;
                 commands.entity(player).despawn_recursive();
                 let _ = state.set(GameState::Interlude);
             }
@@ -216,9 +221,6 @@ fn spawn_enemies(
     .try_into()
     .unwrap();
     let mut rng = ChaCha8Rng::from_seed(seed);
-    // if !rng.gen_bool(0.02) {
-    //     return;
-    // }
     let translation = Vec3::new(
         rng.gen_range(0..MAP_SIZE) as f32 - MAP_SIZE as f32 / 2.,
         rng.gen_range(0..MAP_SIZE) as f32 - MAP_SIZE as f32 / 2.,
@@ -236,6 +238,7 @@ fn spawn_enemies(
             texture_atlas: enemy_assets.enemy1.clone(),
             ..Default::default()
         })
+        .insert(Enemy)
         .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
         .insert(Rollback::new(rollback_id_provider.next_id()));
 }
@@ -276,7 +279,7 @@ fn fire_bullets(
                     ..default()
                 })
                 .insert(*move_dir)
-                .insert(Bullet)
+                .insert(Bullet { damage: 100. })
                 .insert(Rollback::new(rip.next_id()));
             bullet_ready.0 = false;
         }

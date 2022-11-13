@@ -20,6 +20,21 @@ pub struct Player {
     pub handle: usize,
 }
 
+#[derive(Component)]
+pub struct Health {
+    pub max: f64,
+    pub current: f64,
+}
+
+impl Health {
+    pub(crate) fn new(hp: f64) -> Self {
+        Health {
+            max: hp,
+            current: hp,
+        }
+    }
+}
+
 #[derive(Component, Reflect, Default)]
 pub struct BulletReady(pub bool);
 

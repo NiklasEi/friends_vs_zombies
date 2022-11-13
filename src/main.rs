@@ -28,6 +28,7 @@ mod players;
 mod ui;
 
 const PLAYER_RADIUS: f32 = 0.5;
+const ENEMY_RADIUS: f32 = 0.5;
 const BULLET_RADIUS: f32 = 0.025;
 const MAP_SIZE: i32 = 41;
 const GRID_WIDTH: f32 = 0.05;
@@ -42,7 +43,10 @@ enum GameState {
 }
 
 #[derive(Component, Reflect, Default)]
-pub struct Bullet;
+pub struct Bullet {
+    damage: f64,
+}
+
 fn main() {
     let mut app = App::new();
 
