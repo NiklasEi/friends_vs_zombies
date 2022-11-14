@@ -1,6 +1,8 @@
 use crate::loading::FontAssets;
 use crate::matchmaking::{LocalPlayer, RemotePlayers, StartGame};
 use crate::menu::{ButtonColors, GameCode};
+use crate::networking::HealthBar;
+use crate::players::Health;
 use crate::{GameMode, GameState};
 use bevy::prelude::*;
 
@@ -18,6 +20,7 @@ impl Plugin for UiPlugin {
                 .with_system(update_player_list)
                 .with_system(click_start_button),
         )
+        .add_system_set(SystemSet::on_update(GameState::InGame).with_system(update_health_bars))
         .add_system_set(
             SystemSet::on_exit(GameState::Matchmaking).with_system(remove_matchmaking_only_ui),
         );
@@ -237,6 +240,19 @@ fn update_player_list(
                     color: Color::rgb_u8(34, 32, 52),
                 },
             })
+        }
+    }
+}
+
+pub fn update_health_bars(
+    children: Query<(&Children, &Health), (Changed<Health>, Without<HealthBar>)>,
+    mut bars: Query<&mut Transform, With<HealthBar>>,
+) {
+    for (children, health) in &children {
+        for child in children.iter() {
+            if let Ok(mut transform) = bars.get_mut(child.clone()) {
+                transform.scale.x = (health.current / health.max) as f32;
+            }
         }
     }
 }

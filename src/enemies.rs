@@ -1,4 +1,4 @@
-use crate::players::Player;
+use crate::players::{Health, Player};
 use crate::{Bullet, BULLET_RADIUS, ENEMY_RADIUS};
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
@@ -14,17 +14,21 @@ pub struct Enemy;
 
 pub fn kill_enemies(
     mut commands: Commands,
-    enemy_query: Query<(Entity, &Transform), (With<Enemy>, Without<Bullet>)>,
-    bullet_query: Query<&Transform, With<Bullet>>,
+    mut enemy_query: Query<(Entity, &Transform, &mut Health), (With<Enemy>, Without<Bullet>)>,
+    bullet_query: Query<(Entity, &Transform, &Bullet)>,
 ) {
-    for (enemy, enemy_transform) in enemy_query.iter() {
-        for bullet_transform in bullet_query.iter() {
+    for (enemy, enemy_transform, mut health) in enemy_query.iter_mut() {
+        // Todo: despawn bullets
+        for (_bullet_entity, bullet_transform, bullet) in bullet_query.iter() {
             let distance = Vec2::distance(
                 enemy_transform.translation.xy(),
                 bullet_transform.translation.xy(),
             );
             if distance < ENEMY_RADIUS + BULLET_RADIUS {
-                commands.entity(enemy).despawn_recursive();
+                health.current = (health.current - bullet.damage).max(0.);
+                if health.current <= 0. {
+                    commands.entity(enemy).despawn_recursive();
+                }
             }
         }
     }

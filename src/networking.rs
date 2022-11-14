@@ -87,6 +87,9 @@ fn interlude_timer(mut timer: ResMut<InterludeTimer>, mut state: ResMut<State<Ga
     }
 }
 
+#[derive(Component)]
+pub struct HealthBar;
+
 pub fn spawn_players(
     mut commands: Commands,
     mut rollback_id_provider: ResMut<RollbackIdProvider>,
@@ -111,8 +114,21 @@ pub fn spawn_players(
             .insert(Player { handle: player })
             .insert(BulletReady(true))
             .insert(MoveDir(-Vec2::X))
-            .insert(Health::new(100.))
-            .insert(Rollback::new(rollback_id_provider.next_id()));
+            .insert(Health::new(500.))
+            .insert(Rollback::new(rollback_id_provider.next_id()))
+            .with_children(|parent| {
+                parent
+                    .spawn_bundle(SpriteBundle {
+                        sprite: Sprite {
+                            color: Color::RED,
+                            custom_size: Some(Vec2::new(100., 5.1)),
+                            ..default()
+                        },
+                        transform: Transform::from_translation(Vec3::new(0., 50., 1.)),
+                        ..default()
+                    })
+                    .insert(HealthBar);
+            });
     }
 }
 
@@ -142,9 +158,11 @@ fn kill_players(
                 bullet_transform.translation.xy(),
             );
             if distance < PLAYER_RADIUS + BULLET_RADIUS {
-                health.current -= bullet.damage;
-                commands.entity(player).despawn_recursive();
-                let _ = state.set(GameState::Interlude);
+                health.current = (health.current - bullet.damage).max(0.);
+                if health.current <= 0. {
+                    commands.entity(player).despawn_recursive();
+                    let _ = state.set(GameState::Interlude);
+                }
             }
         }
     }
@@ -238,9 +256,23 @@ fn spawn_enemies(
             texture_atlas: enemy_assets.enemy1.clone(),
             ..Default::default()
         })
+        .insert(Health::new(200.))
         .insert(Enemy)
         .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
-        .insert(Rollback::new(rollback_id_provider.next_id()));
+        .insert(Rollback::new(rollback_id_provider.next_id()))
+        .with_children(|parent| {
+            parent
+                .spawn_bundle(SpriteBundle {
+                    sprite: Sprite {
+                        color: Color::RED,
+                        custom_size: Some(Vec2::new(100., 5.1)),
+                        ..default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(0., 50., 1.)),
+                    ..default()
+                })
+                .insert(HealthBar);
+        });
 }
 
 fn reload_bullet(
