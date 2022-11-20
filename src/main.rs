@@ -8,7 +8,7 @@ use crate::map::MapPlugin;
 use crate::matchmaking::MatchmakingPlugin;
 use crate::menu::MenuPlugin;
 use crate::networking::{GgrsConfig, InterludeTimer, NetworkingPlugin};
-use crate::players::{BulletReady, LocalPlayerId, MoveDir, Player, PlayersPlugin};
+use crate::players::{LocalPlayerId, MoveDir, Player, PlayersPlugin, Weapon};
 use crate::ui::UiPlugin;
 use bevy::prelude::*;
 use bevy::window::WindowId;
@@ -45,6 +45,24 @@ enum GameState {
 #[derive(Component, Reflect, Default)]
 pub struct Bullet {
     damage: f64,
+    already_hit: Vec<Entity>,
+}
+
+impl Bullet {
+    pub fn with_damage(damage: f64) -> Self {
+        Bullet {
+            damage,
+            already_hit: Vec::new(),
+        }
+    }
+
+    pub fn hit(&mut self, entity: Entity) -> bool {
+        if self.already_hit.contains(&entity) {
+            return false;
+        }
+        self.already_hit.push(entity);
+        true
+    }
 }
 
 fn main() {

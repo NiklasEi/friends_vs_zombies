@@ -2,14 +2,16 @@
 name = "bevy_boxhead"
 version = "0.1.0"
 edition = "2021"
+exclude = ["dist", "build", "assets", "credits"]
 
 [dependencies]
 bevy = "0.8"
 ggrs = "0.9"
+anyhow = "1"
 bevy_ggrs = { version = "0.10", features = ["wasm-bindgen"] }
 matchbox_socket = { version = "0.4", features = ["ggrs-socket"] }
 bevy_asset_loader = {version = "0.12", features = ["2d"]}
-bevy_common_assets = {version = "0.3", features = ["json"]}
+bevy_common_assets = {version = "0.3", features = ["json", "ron"]}
 serde = "1"
 rand = "=0.8.5"
 rand_chacha = "=0.3.1"

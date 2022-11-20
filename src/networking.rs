@@ -1,9 +1,9 @@
 use crate::enemies::{kill_enemies, move_enemies, Enemy};
-use crate::loading::{EnemyAssets, PlayerAssets};
+use crate::loading::{EnemyAssets, EnemyData, PlayerAssets};
 use crate::matchmaking::Seed;
 use crate::players::{AnimationTimer, Health};
 use crate::{
-    direction, fire, game_input, Bullet, BulletReady, GameState, ImageAssets, MoveDir, Player,
+    direction, fire, game_input, Bullet, GameState, ImageAssets, MoveDir, Player, Weapon,
     BULLET_RADIUS, MAP_SIZE, PLAYER_RADIUS,
 };
 use bevy::math::Vec3Swizzles;
@@ -45,17 +45,16 @@ impl Plugin for NetworkingPlugin {
                                 .with_system(advance_seed_frame)
                                 .with_system(spawn_enemies.after(advance_seed_frame))
                                 .with_system(move_players.after(advance_seed_frame))
-                                .with_system(reload_bullet.after(advance_seed_frame))
                                 .with_system(move_bullet.after(advance_seed_frame))
                                 .with_system(kill_enemies.after(move_bullet))
-                                .with_system(fire_bullets.after(move_players).after(reload_bullet))
+                                .with_system(fire_bullets.after(move_players))
                                 .with_system(move_enemies.after(move_players))
                                 .with_system(kill_players.after(kill_enemies).after(move_players)),
                         ),
                 ),
             )
             .register_rollback_type::<Transform>()
-            .register_rollback_type::<BulletReady>()
+            .register_rollback_type::<Weapon>()
             .register_rollback_type::<MoveDir>()
             .register_rollback_type::<EnemyTimer>()
             .build(app);
@@ -112,7 +111,7 @@ pub fn spawn_players(
             })
             .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
             .insert(Player { handle: player })
-            .insert(BulletReady(true))
+            .insert(Weapon::new())
             .insert(MoveDir(-Vec2::X))
             .insert(Health::new(500.))
             .insert(Rollback::new(rollback_id_provider.next_id()))
@@ -149,15 +148,15 @@ fn kill_players(
     mut commands: Commands,
     mut state: ResMut<State<GameState>>,
     mut player_query: Query<(Entity, &Transform, &mut Health), (With<Player>, Without<Bullet>)>,
-    bullet_query: Query<(&Transform, &Bullet)>,
+    mut bullet_query: Query<(&Transform, &mut Bullet)>,
 ) {
     for (player, player_transform, mut health) in player_query.iter_mut() {
-        for (bullet_transform, bullet) in bullet_query.iter() {
+        for (bullet_transform, mut bullet) in bullet_query.iter_mut() {
             let distance = Vec2::distance(
                 player_transform.translation.xy(),
                 bullet_transform.translation.xy(),
             );
-            if distance < PLAYER_RADIUS + BULLET_RADIUS {
+            if distance < PLAYER_RADIUS + BULLET_RADIUS && bullet.hit(player) {
                 health.current = (health.current - bullet.damage).max(0.);
                 if health.current <= 0. {
                     commands.entity(player).despawn_recursive();
@@ -178,12 +177,10 @@ fn move_players(
         let direction = direction(input);
 
         if direction == Vec2::ZERO {
-            info!("pause {}", player.handle);
             animation_timer.0.pause();
             continue;
         }
         if animation_timer.0.paused() {
-            info!("unpause {}", player.handle);
             animation_timer.0.unpause();
         }
 
@@ -206,7 +203,7 @@ fn advance_seed_frame(mut frame: ResMut<SeedFrame>) {
 }
 
 #[derive(Reflect, Component, Default)]
-struct SeedFrame(u16);
+pub struct SeedFrame(pub(crate) u32);
 
 #[derive(Reflect, Component)]
 struct EnemyTimer(Timer);
@@ -221,6 +218,7 @@ fn spawn_enemies(
     mut commands: Commands,
     seed: Res<Seed>,
     enemy_assets: Res<EnemyAssets>,
+    enemy_data: Res<Assets<EnemyData>>,
     seed_frame: Res<SeedFrame>,
     mut enemy_timer: ResMut<EnemyTimer>,
     mut rollback_id_provider: ResMut<RollbackIdProvider>,
@@ -234,8 +232,12 @@ fn spawn_enemies(
         seed_frame.0 as u8,
         seed.0[1],
         seed.0[2],
+        (seed_frame.0 >> 16) as u8,
+        (seed_frame.0 >> 24) as u8,
+        seed.0[1],
+        seed.0[2],
     ]
-    .repeat(8)
+    .repeat(4)
     .try_into()
     .unwrap();
     let mut rng = ChaCha8Rng::from_seed(seed);
@@ -244,7 +246,27 @@ fn spawn_enemies(
         rng.gen_range(0..MAP_SIZE) as f32 - MAP_SIZE as f32 / 2.,
         100.,
     );
+    let enemy_index = rng.gen_range(0..100);
     info!("Spawning enemy at {:?}", translation);
+    spawn_enemy(
+        &mut commands,
+        &enemy_assets,
+        &mut rollback_id_provider,
+        &enemy_data,
+        translation,
+        enemy_index,
+    );
+}
+
+fn spawn_enemy(
+    commands: &mut Commands,
+    enemy_assets: &EnemyAssets,
+    rollback_id_provider: &mut RollbackIdProvider,
+    enemy_data: &Assets<EnemyData>,
+    translation: Vec3,
+    enemy_index: i32,
+) {
+    let enemy = enemy_data.get(enemy_assets.get(enemy_index)).unwrap();
     commands
         .spawn_bundle(SpriteSheetBundle {
             transform: Transform {
@@ -253,11 +275,14 @@ fn spawn_enemies(
                 ..Default::default()
             },
             sprite: TextureAtlasSprite::new(0),
-            texture_atlas: enemy_assets.enemy1.clone(),
+            texture_atlas: enemy.texture_atlas.clone(),
             ..Default::default()
         })
-        .insert(Health::new(200.))
-        .insert(Enemy)
+        .insert(Health::new(enemy.health))
+        .insert(Enemy {
+            damage: enemy.damage,
+            speed: enemy.speed,
+        })
         .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
         .insert(Rollback::new(rollback_id_provider.next_id()))
         .with_children(|parent| {
@@ -275,28 +300,17 @@ fn spawn_enemies(
         });
 }
 
-fn reload_bullet(
-    inputs: Res<Vec<(u8, InputStatus)>>,
-    mut query: Query<(&mut BulletReady, &Player)>,
-) {
-    for (mut can_fire, player) in query.iter_mut() {
-        let (input, _) = inputs[player.handle];
-        if !fire(input) {
-            can_fire.0 = true;
-        }
-    }
-}
-
 fn fire_bullets(
     mut commands: Commands,
     inputs: Res<Vec<(u8, InputStatus)>>,
     images: Res<ImageAssets>,
-    mut player_query: Query<(&Transform, &Player, &mut BulletReady, &MoveDir)>,
+    seed_frame: Res<SeedFrame>,
+    mut player_query: Query<(&Transform, &Player, &mut Weapon, &MoveDir)>,
     mut rip: ResMut<RollbackIdProvider>,
 ) {
-    for (transform, player, mut bullet_ready, move_dir) in player_query.iter_mut() {
+    for (transform, player, mut weapon, move_dir) in player_query.iter_mut() {
         let (input, _) = inputs[player.handle];
-        if fire(input) && bullet_ready.0 {
+        if fire(input) && weapon.shoot(&seed_frame) {
             let player_pos = transform.translation.xy();
             let pos = player_pos + move_dir.0 * PLAYER_RADIUS + BULLET_RADIUS;
             commands
@@ -311,9 +325,8 @@ fn fire_bullets(
                     ..default()
                 })
                 .insert(*move_dir)
-                .insert(Bullet { damage: 100. })
+                .insert(Bullet::with_damage(100.))
                 .insert(Rollback::new(rip.next_id()));
-            bullet_ready.0 = false;
         }
     }
 }

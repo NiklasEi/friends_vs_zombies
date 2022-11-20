@@ -3,16 +3,25 @@ use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy_asset_loader::prelude::*;
 use bevy_common_assets::json::JsonAssetPlugin;
+use bevy_common_assets::ron::RonAssetPlugin;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
+use std::collections::HashMap;
 
 pub struct LoadingPlugin;
 
 impl Plugin for LoadingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(JsonAssetPlugin::<PlayerNames>::new(&["names"]))
+        app.add_asset::<EnemyData>()
+            .add_plugin(JsonAssetPlugin::<PlayerNames>::new(&["names"]))
+            .add_plugin(RonAssetPlugin::<CustomDynamicAssetCollection>::new(&[
+                "my-assets",
+            ]))
             .add_loading_state(
                 LoadingState::new(GameState::AssetLoading)
+                    .with_dynamic_collections::<CustomDynamicAssetCollection>(vec![
+                        "enemies.my-assets",
+                    ])
                     .with_collection::<ImageAssets>()
                     .with_collection::<FontAssets>()
                     .with_collection::<GameData>()
@@ -44,9 +53,20 @@ pub struct PlayerAssets {
 
 #[derive(AssetCollection)]
 pub struct EnemyAssets {
-    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
-    #[asset(path = "enemies/enemy1.png")]
-    pub enemy1: Handle<TextureAtlas>,
+    #[asset(key = "devil")]
+    pub devil: Handle<EnemyData>,
+    #[asset(key = "zombie")]
+    pub zombie: Handle<EnemyData>,
+}
+
+impl EnemyAssets {
+    pub fn get(&self, random_index: i32) -> &Handle<EnemyData> {
+        if random_index > 80 {
+            &self.devil
+        } else {
+            &self.zombie
+        }
+    }
 }
 
 #[derive(AssetCollection)]
@@ -69,5 +89,85 @@ impl PlayerNames {
         let name = self.0.get(index).unwrap().clone();
         info!("Chose name {} for id {}", name, id);
         name
+    }
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+enum CustomDynamicAsset {
+    Enemy {
+        sprite_sheet: String,
+        speed: f32,
+        damage: f64,
+        health: f64,
+    },
+}
+
+#[derive(TypeUuid)]
+#[uuid = "7fd2fcba-df98-c126-4692-b29b2d9b78b9"]
+pub struct EnemyData {
+    pub texture_atlas: Handle<TextureAtlas>,
+    pub speed: f32,
+    pub damage: f64,
+    pub health: f64,
+}
+
+impl DynamicAsset for CustomDynamicAsset {
+    fn load(&self, asset_server: &AssetServer) -> Vec<HandleUntyped> {
+        match self {
+            CustomDynamicAsset::Enemy { sprite_sheet, .. } => {
+                vec![asset_server.load_untyped(sprite_sheet)]
+            }
+        }
+    }
+
+    fn build(&self, world: &mut World) -> Result<DynamicAssetType, anyhow::Error> {
+        let cell = world.cell();
+        let asset_server = cell
+            .get_resource::<AssetServer>()
+            .expect("Failed to get asset server");
+        match self {
+            CustomDynamicAsset::Enemy {
+                sprite_sheet,
+                speed,
+                damage,
+                health,
+            } => {
+                let mut atlases = cell
+                    .get_resource_mut::<Assets<TextureAtlas>>()
+                    .expect("Failed to get TextureAtlas assets");
+                let mut enemies = cell
+                    .get_resource_mut::<Assets<EnemyData>>()
+                    .expect("Failed to get EnemyData assets");
+                let atlas = TextureAtlas::from_grid(
+                    asset_server.load(sprite_sheet),
+                    Vec2::splat(96.),
+                    4,
+                    1,
+                );
+
+                Ok(DynamicAssetType::Single(
+                    enemies
+                        .add(EnemyData {
+                            texture_atlas: atlases.add(atlas),
+                            speed: *speed,
+                            damage: *damage,
+                            health: *health,
+                        })
+                        .clone_untyped(),
+                ))
+            }
+        }
+    }
+}
+
+#[derive(serde::Deserialize, bevy::reflect::TypeUuid)]
+#[uuid = "18dc82eb-d5f5-4d72-b0c4-e2b234367c35"]
+pub struct CustomDynamicAssetCollection(HashMap<String, CustomDynamicAsset>);
+
+impl DynamicAssetCollection for CustomDynamicAssetCollection {
+    fn register(&self, dynamic_assets: &mut DynamicAssets) {
+        for (key, asset) in self.0.iter() {
+            dynamic_assets.register_asset(key, Box::new(asset.clone()));
+        }
     }
 }

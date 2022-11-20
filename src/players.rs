@@ -1,3 +1,4 @@
+use crate::networking::SeedFrame;
 use crate::GameState;
 use bevy::prelude::*;
 
@@ -36,7 +37,28 @@ impl Health {
 }
 
 #[derive(Component, Reflect, Default)]
-pub struct BulletReady(pub bool);
+pub struct Weapon {
+    fire_frame: u32,
+    frame_cooldown: u32,
+}
+
+impl Weapon {
+    pub fn new() -> Self {
+        Weapon {
+            fire_frame: 0,
+            frame_cooldown: 60,
+        }
+    }
+
+    pub fn shoot(&mut self, seed_frame: &SeedFrame) -> bool {
+        if self.fire_frame.wrapping_add(self.frame_cooldown) < seed_frame.0 {
+            self.fire_frame = seed_frame.0;
+            true
+        } else {
+            false
+        }
+    }
+}
 
 #[derive(Component, Reflect, Default, Clone, Copy)]
 pub struct MoveDir(pub Vec2);

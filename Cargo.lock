@@ -610,6 +610,7 @@ dependencies = [
 name = "bevy_boxhead"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bevy",
  "bevy_asset_loader",
  "bevy_common_assets",
@@ -632,6 +633,7 @@ checksum = "3f7be9ee39085d8319d5cd853447b0b5c4f8b4bfd647aec91e2bd996e9db67ef"
 dependencies = [
  "anyhow",
  "bevy",
+ "ron",
  "serde",
  "serde_json",
 ]
