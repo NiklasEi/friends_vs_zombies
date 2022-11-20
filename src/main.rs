@@ -2,6 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![allow(clippy::type_complexity)]
 
+extern crate core;
+
 use crate::enemies::EnemiesPlugin;
 use crate::loading::{ImageAssets, LoadingPlugin};
 use crate::map::MapPlugin;
@@ -49,10 +51,10 @@ pub struct Bullet {
 }
 
 impl Bullet {
-    pub fn with_damage(damage: f64) -> Self {
+    pub fn new(damage: f64, shooter: Entity) -> Self {
         Bullet {
             damage,
-            already_hit: Vec::new(),
+            already_hit: vec![shooter],
         }
     }
 

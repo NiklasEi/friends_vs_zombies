@@ -1,5 +1,5 @@
 use crate::players::{Health, Player};
-use crate::{Bullet, BULLET_RADIUS, ENEMY_RADIUS};
+use crate::{Bullet, BULLET_RADIUS, ENEMY_RADIUS, PLAYER_RADIUS};
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
 
@@ -51,10 +51,12 @@ pub fn move_enemies(
                 closest
             }
         }) {
-            let direction = (closest_position.translation.xy() - transform.translation.xy())
-                .normalize_or_zero();
+            let distance = closest_position.translation.xy() - transform.translation.xy();
+            if distance.length() < PLAYER_RADIUS / 4. {
+                continue;
+            }
 
-            let move_delta = direction * enemy.speed;
+            let move_delta = distance.normalize_or_zero() * enemy.speed;
             transform.translation.x += move_delta.x;
             transform.translation.y += move_delta.y;
         }

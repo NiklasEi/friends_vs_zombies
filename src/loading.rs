@@ -49,6 +49,51 @@ pub struct PlayerAssets {
     #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
     #[asset(path = "players/player1.png")]
     pub player1: Handle<TextureAtlas>,
+    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
+    #[asset(path = "players/player2.png")]
+    pub player2: Handle<TextureAtlas>,
+    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
+    #[asset(path = "players/player3.png")]
+    pub player3: Handle<TextureAtlas>,
+    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
+    #[asset(path = "players/player4.png")]
+    pub player4: Handle<TextureAtlas>,
+    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
+    #[asset(path = "players/player5.png")]
+    pub player5: Handle<TextureAtlas>,
+    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
+    #[asset(path = "players/player6.png")]
+    pub player6: Handle<TextureAtlas>,
+    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
+    #[asset(path = "players/player7.png")]
+    pub player7: Handle<TextureAtlas>,
+    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
+    #[asset(path = "players/player8.png")]
+    pub player8: Handle<TextureAtlas>,
+    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
+    #[asset(path = "players/player9.png")]
+    pub player9: Handle<TextureAtlas>,
+    #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
+    #[asset(path = "players/player10.png")]
+    pub player10: Handle<TextureAtlas>,
+}
+
+impl PlayerAssets {
+    pub fn get_atlas(&self, player: usize) -> &Handle<TextureAtlas> {
+        match player % 10 {
+            0 => &self.player1,
+            1 => &self.player2,
+            2 => &self.player3,
+            3 => &self.player4,
+            4 => &self.player5,
+            5 => &self.player6,
+            6 => &self.player7,
+            7 => &self.player8,
+            8 => &self.player9,
+            9 => &self.player10,
+            _ => panic!("Whuuut?"),
+        }
+    }
 }
 
 #[derive(AssetCollection)]

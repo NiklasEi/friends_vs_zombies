@@ -54,7 +54,9 @@ impl Plugin for NetworkingPlugin {
                 ),
             )
             .register_rollback_type::<Transform>()
+            .register_rollback_type::<SeedFrame>()
             .register_rollback_type::<Weapon>()
+            .register_rollback_type::<Bullet>()
             .register_rollback_type::<MoveDir>()
             .register_rollback_type::<EnemyTimer>()
             .build(app);
@@ -106,7 +108,7 @@ pub fn spawn_players(
                     ..Default::default()
                 },
                 sprite: TextureAtlasSprite::new(0),
-                texture_atlas: player_assets.player1.clone(),
+                texture_atlas: player_assets.get_atlas(player).clone(),
                 ..Default::default()
             })
             .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
@@ -116,6 +118,15 @@ pub fn spawn_players(
             .insert(Health::new(500.))
             .insert(Rollback::new(rollback_id_provider.next_id()))
             .with_children(|parent| {
+                parent.spawn_bundle(SpriteBundle {
+                    sprite: Sprite {
+                        color: Color::DARK_GRAY,
+                        custom_size: Some(Vec2::new(100., 5.1)),
+                        ..default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(0., 50., 1.)),
+                    ..default()
+                });
                 parent
                     .spawn_bundle(SpriteBundle {
                         sprite: Sprite {
@@ -123,7 +134,7 @@ pub fn spawn_players(
                             custom_size: Some(Vec2::new(100., 5.1)),
                             ..default()
                         },
-                        transform: Transform::from_translation(Vec3::new(0., 50., 1.)),
+                        transform: Transform::from_translation(Vec3::new(0., 50., 2.)),
                         ..default()
                     })
                     .insert(HealthBar);
@@ -286,6 +297,15 @@ fn spawn_enemy(
         .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
         .insert(Rollback::new(rollback_id_provider.next_id()))
         .with_children(|parent| {
+            parent.spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    color: Color::DARK_GRAY,
+                    custom_size: Some(Vec2::new(100., 5.1)),
+                    ..default()
+                },
+                transform: Transform::from_translation(Vec3::new(0., 50., 1.)),
+                ..default()
+            });
             parent
                 .spawn_bundle(SpriteBundle {
                     sprite: Sprite {
@@ -293,7 +313,7 @@ fn spawn_enemy(
                         custom_size: Some(Vec2::new(100., 5.1)),
                         ..default()
                     },
-                    transform: Transform::from_translation(Vec3::new(0., 50., 1.)),
+                    transform: Transform::from_translation(Vec3::new(0., 50., 2.)),
                     ..default()
                 })
                 .insert(HealthBar);
@@ -305,17 +325,15 @@ fn fire_bullets(
     inputs: Res<Vec<(u8, InputStatus)>>,
     images: Res<ImageAssets>,
     seed_frame: Res<SeedFrame>,
-    mut player_query: Query<(&Transform, &Player, &mut Weapon, &MoveDir)>,
+    mut player_query: Query<(Entity, &Transform, &Player, &mut Weapon, &MoveDir)>,
     mut rip: ResMut<RollbackIdProvider>,
 ) {
-    for (transform, player, mut weapon, move_dir) in player_query.iter_mut() {
+    for (entity, transform, player, mut weapon, move_dir) in player_query.iter_mut() {
         let (input, _) = inputs[player.handle];
         if fire(input) && weapon.shoot(&seed_frame) {
-            let player_pos = transform.translation.xy();
-            let pos = player_pos + move_dir.0 * PLAYER_RADIUS + BULLET_RADIUS;
             commands
                 .spawn_bundle(SpriteBundle {
-                    transform: Transform::from_translation(pos.extend(200.))
+                    transform: Transform::from_translation(transform.translation.xy().extend(200.))
                         .with_rotation(Quat::from_rotation_arc_2d(Vec2::X, move_dir.0)),
                     texture: images.bullet.clone(),
                     sprite: Sprite {
@@ -325,7 +343,7 @@ fn fire_bullets(
                     ..default()
                 })
                 .insert(*move_dir)
-                .insert(Bullet::with_damage(100.))
+                .insert(Bullet::new(100., entity))
                 .insert(Rollback::new(rip.next_id()));
         }
     }
