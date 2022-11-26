@@ -12,6 +12,7 @@ use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider};
 use ggrs::{InputStatus, P2PSession};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use std::f32::consts::PI;
 use std::time::Duration;
 
 pub struct NetworkingPlugin;
@@ -59,6 +60,7 @@ impl Plugin for NetworkingPlugin {
             .register_rollback_type::<Bullet>()
             .register_rollback_type::<MoveDir>()
             .register_rollback_type::<EnemyTimer>()
+            .register_rollback_type::<Dead>()
             .build(app);
     }
 }
@@ -157,11 +159,13 @@ fn remove_players(
 
 fn kill_players(
     mut commands: Commands,
-    mut state: ResMut<State<GameState>>,
-    mut player_query: Query<(Entity, &Transform, &mut Health), (With<Player>, Without<Bullet>)>,
+    mut player_query: Query<
+        (Entity, &mut Transform, &mut Health),
+        (With<Player>, Without<Bullet>, Without<Dead>),
+    >,
     mut bullet_query: Query<(&Transform, &mut Bullet)>,
 ) {
-    for (player, player_transform, mut health) in player_query.iter_mut() {
+    for (player, mut player_transform, mut health) in player_query.iter_mut() {
         for (bullet_transform, mut bullet) in bullet_query.iter_mut() {
             let distance = Vec2::distance(
                 player_transform.translation.xy(),
@@ -170,20 +174,35 @@ fn kill_players(
             if distance < PLAYER_RADIUS + BULLET_RADIUS && bullet.hit(player) {
                 health.current = (health.current - bullet.damage).max(0.);
                 if health.current <= 0. {
-                    commands.entity(player).despawn_recursive();
-                    let _ = state.set(GameState::Interlude);
+                    commands.entity(player).insert(Dead);
+                    player_transform.rotation = Quat::from_rotation_z(PI / 2.);
                 }
             }
         }
     }
 }
 
+#[derive(Reflect, Component, Default)]
+pub struct Dead;
+
 fn move_players(
     inputs: Res<Vec<(u8, InputStatus)>>,
-    mut player_query: Query<(&mut Transform, &mut MoveDir, &Player, &mut AnimationTimer)>,
+    mut player_query: Query<(
+        Entity,
+        &mut Transform,
+        &mut MoveDir,
+        &Player,
+        &mut AnimationTimer,
+    )>,
+    dead: Query<&Dead>,
 ) {
-    for (mut transform, mut move_direction, player, mut animation_timer) in player_query.iter_mut()
+    for (player_entity, mut transform, mut move_direction, player, mut animation_timer) in
+        player_query.iter_mut()
     {
+        if dead.contains(player_entity) {
+            animation_timer.0.pause();
+            continue;
+        }
         let (input, _) = inputs[player.handle];
         let direction = direction(input);
 
@@ -293,6 +312,8 @@ fn spawn_enemy(
         .insert(Enemy {
             damage: enemy.damage,
             speed: enemy.speed,
+            attack_cooldown: enemy.attack_cooldown as u32,
+            last_attack: 0,
         })
         .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
         .insert(Rollback::new(rollback_id_provider.next_id()))
@@ -325,7 +346,7 @@ fn fire_bullets(
     inputs: Res<Vec<(u8, InputStatus)>>,
     images: Res<ImageAssets>,
     seed_frame: Res<SeedFrame>,
-    mut player_query: Query<(Entity, &Transform, &Player, &mut Weapon, &MoveDir)>,
+    mut player_query: Query<(Entity, &Transform, &Player, &mut Weapon, &MoveDir), Without<Dead>>,
     mut rip: ResMut<RollbackIdProvider>,
 ) {
     for (entity, transform, player, mut weapon, move_dir) in player_query.iter_mut() {

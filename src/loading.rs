@@ -144,6 +144,7 @@ enum CustomDynamicAsset {
         speed: f32,
         damage: f64,
         health: f64,
+        attack_cooldown: u8,
     },
 }
 
@@ -154,6 +155,7 @@ pub struct EnemyData {
     pub speed: f32,
     pub damage: f64,
     pub health: f64,
+    pub attack_cooldown: u8,
 }
 
 impl DynamicAsset for CustomDynamicAsset {
@@ -176,6 +178,7 @@ impl DynamicAsset for CustomDynamicAsset {
                 speed,
                 damage,
                 health,
+                attack_cooldown,
             } => {
                 let mut atlases = cell
                     .get_resource_mut::<Assets<TextureAtlas>>()
@@ -195,6 +198,7 @@ impl DynamicAsset for CustomDynamicAsset {
                         .add(EnemyData {
                             texture_atlas: atlases.add(atlas),
                             speed: *speed,
+                            attack_cooldown: *attack_cooldown,
                             damage: *damage,
                             health: *health,
                         })

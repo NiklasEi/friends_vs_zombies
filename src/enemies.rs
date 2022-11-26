@@ -1,3 +1,4 @@
+use crate::networking::Dead;
 use crate::players::{Health, Player};
 use crate::{Bullet, BULLET_RADIUS, ENEMY_RADIUS, PLAYER_RADIUS};
 use bevy::math::Vec3Swizzles;
@@ -13,6 +14,8 @@ impl Plugin for EnemiesPlugin {
 pub struct Enemy {
     pub damage: f64,
     pub speed: f32,
+    pub last_attack: u32,
+    pub attack_cooldown: u32,
 }
 
 pub fn kill_enemies(
@@ -39,7 +42,7 @@ pub fn kill_enemies(
 
 pub fn move_enemies(
     mut enemy_query: Query<(&mut Transform, &Enemy)>,
-    player_query: Query<&Transform, (Without<Enemy>, With<Player>)>,
+    player_query: Query<&Transform, (Without<Enemy>, With<Player>, Without<Dead>)>,
 ) {
     for (mut transform, enemy) in &mut enemy_query {
         if let Some(closest_position) = player_query.iter().reduce(|closest, current| {
