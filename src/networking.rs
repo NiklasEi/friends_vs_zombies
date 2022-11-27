@@ -33,7 +33,7 @@ impl Plugin for NetworkingPlugin {
                                 .with_system(reset_interlude_timer),
                         )
                         .with_system_set(
-                            SystemSet::on_exit(GameState::Interlude).with_system(remove_players),
+                            SystemSet::on_exit(GameState::Interlude).with_system(remove_entities),
                         )
                         .with_system_set(
                             SystemSet::on_update(GameState::Interlude).with_system(interlude_timer),
@@ -50,7 +50,13 @@ impl Plugin for NetworkingPlugin {
                                 .with_system(kill_enemies.after(move_bullet))
                                 .with_system(fire_bullets.after(move_players))
                                 .with_system(move_enemies.after(move_players))
-                                .with_system(kill_players.after(kill_enemies).after(move_players)),
+                                .with_system(
+                                    bullets_hitting_players
+                                        .after(kill_enemies)
+                                        .after(move_players),
+                                )
+                                .with_system(kill_players.after(bullets_hitting_players))
+                                .with_system(end_game.after(kill_players)),
                         ),
                 ),
             )
@@ -144,10 +150,17 @@ pub fn spawn_players(
     }
 }
 
-fn remove_players(
+fn end_game(alive_players: Query<&Player, Without<Dead>>, mut state: ResMut<State<GameState>>) {
+    if alive_players.is_empty() {
+        state.set(GameState::Interlude).unwrap();
+    }
+}
+
+fn remove_entities(
     mut commands: Commands,
     player_query: Query<Entity, With<Player>>,
     bullet_query: Query<Entity, With<Bullet>>,
+    enemy_query: Query<Entity, With<Enemy>>,
 ) {
     for player in player_query.iter() {
         commands.entity(player).despawn_recursive();
@@ -155,29 +168,46 @@ fn remove_players(
     for bullet in bullet_query.iter() {
         commands.entity(bullet).despawn_recursive();
     }
+    for enemy in enemy_query.iter() {
+        commands.entity(enemy).despawn_recursive();
+    }
 }
 
-fn kill_players(
-    mut commands: Commands,
+fn bullets_hitting_players(
     mut player_query: Query<
-        (Entity, &mut Transform, &mut Health),
+        (Entity, &Transform, &mut Health),
         (With<Player>, Without<Bullet>, Without<Dead>),
     >,
     mut bullet_query: Query<(&Transform, &mut Bullet)>,
 ) {
-    for (player, mut player_transform, mut health) in player_query.iter_mut() {
+    for (player, player_transform, mut health) in player_query.iter_mut() {
         for (bullet_transform, mut bullet) in bullet_query.iter_mut() {
             let distance = Vec2::distance(
                 player_transform.translation.xy(),
                 bullet_transform.translation.xy(),
             );
             if distance < PLAYER_RADIUS + BULLET_RADIUS && bullet.hit(player) {
-                health.current = (health.current - bullet.damage).max(0.);
-                if health.current <= 0. {
-                    commands.entity(player).insert(Dead);
-                    player_transform.rotation = Quat::from_rotation_z(PI / 2.);
-                }
+                health.current -= bullet.damage;
             }
+        }
+    }
+}
+
+fn kill_players(
+    mut commands: Commands,
+    mut player_query: Query<
+        (Entity, &mut Transform, &mut Health, &Children),
+        (With<Player>, Without<Dead>),
+    >,
+) {
+    for (player, mut player_transform, mut health, children) in player_query.iter_mut() {
+        if health.current <= 0. {
+            health.current = 0.;
+            commands.entity(player).insert(Dead);
+            for child in children {
+                commands.entity(*child).despawn_recursive();
+            }
+            player_transform.rotation = Quat::from_rotation_z(PI / 2.);
         }
     }
 }

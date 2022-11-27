@@ -1,4 +1,4 @@
-use crate::networking::Dead;
+use crate::networking::{Dead, SeedFrame};
 use crate::players::{Health, Player};
 use crate::{Bullet, BULLET_RADIUS, ENEMY_RADIUS, PLAYER_RADIUS};
 use bevy::math::Vec3Swizzles;
@@ -41,21 +41,37 @@ pub fn kill_enemies(
 }
 
 pub fn move_enemies(
-    mut enemy_query: Query<(&mut Transform, &Enemy)>,
-    player_query: Query<&Transform, (Without<Enemy>, With<Player>, Without<Dead>)>,
+    mut enemy_query: Query<(&mut Transform, &mut Enemy)>,
+    mut player_query: Query<
+        (&Transform, &mut Health),
+        (Without<Enemy>, With<Player>, Without<Dead>),
+    >,
+    seed_frame: Res<SeedFrame>,
 ) {
-    for (mut transform, enemy) in &mut enemy_query {
-        if let Some(closest_position) = player_query.iter().reduce(|closest, current| {
-            if closest.translation.distance_squared(transform.translation)
-                > current.translation.distance_squared(transform.translation)
-            {
-                current
-            } else {
-                closest
-            }
-        }) {
+    for (mut transform, mut enemy) in &mut enemy_query {
+        if let Some((closest_position, mut player_health)) =
+            player_query.iter_mut().reduce(|closest, current| {
+                if closest
+                    .0
+                    .translation
+                    .distance_squared(transform.translation)
+                    > current
+                        .0
+                        .translation
+                        .distance_squared(transform.translation)
+                {
+                    current
+                } else {
+                    closest
+                }
+            })
+        {
             let distance = closest_position.translation.xy() - transform.translation.xy();
             if distance.length() < PLAYER_RADIUS / 4. {
+                if enemy.last_attack + enemy.attack_cooldown < seed_frame.0 {
+                    enemy.last_attack = seed_frame.0;
+                    player_health.current -= enemy.damage;
+                }
                 continue;
             }
 
