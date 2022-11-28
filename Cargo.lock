@@ -607,25 +607,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_boxhead"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bevy",
- "bevy_asset_loader",
- "bevy_common_assets",
- "bevy_ggrs",
- "embed-resource",
- "ggrs",
- "image",
- "matchbox_socket",
- "rand",
- "rand_chacha",
- "serde",
- "winit",
-]
-
-[[package]]
 name = "bevy_common_assets"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2218,6 +2199,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9c384f161156f5260c24a097c56119f9be8c798586aecc13afbcbe7b7e26bf8"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "friends_vs_zombies"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "bevy_asset_loader",
+ "bevy_common_assets",
+ "bevy_ggrs",
+ "embed-resource",
+ "ggrs",
+ "image",
+ "matchbox_socket",
+ "rand",
+ "rand_chacha",
+ "serde",
+ "winit",
 ]
 
 [[package]]

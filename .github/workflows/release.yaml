@@ -8,8 +8,8 @@ on:
 env:
   # heads-up: this value is used as a pattern in an sed command as a workaround for a trunk issue
   #   if you use special characters, take a look at the 'Make paths relative' step in the 'build-web' job
-  GAME_EXECUTABLE_NAME: bevy_boxhead
-  GAME_OSX_APP_NAME: BevyBoxhead
+  GAME_EXECUTABLE_NAME: friends_vs_zombies
+  GAME_OSX_APP_NAME: FriendsVsZombies
 
 jobs:
   build-macOS:

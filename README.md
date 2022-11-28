@@ -10,7 +10,7 @@ Currently broken in Firefox, but works in single and multiplayer mode in Chrome.
 
 ## Deployed dev build (might be outdated)
 
-https://niklasei.github.io/bevy_boxhead/
+https://niklasei.github.io/friends_vs_zombies/
 
 
 ## Nginx setup for matchbox server
