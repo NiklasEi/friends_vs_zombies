@@ -245,14 +245,15 @@ fn update_player_list(
 }
 
 pub fn update_health_bars(
-    children: Query<(&Children, &Health), (Changed<Health>, Without<HealthBar>)>,
-    mut bars: Query<&mut Transform, With<HealthBar>>,
+    player: Query<(Entity, &Health), (Changed<Health>, Without<HealthBar>)>,
+    mut bars: Query<(&mut Transform, &HealthBar)>,
 ) {
-    for (children, health) in &children {
-        for child in children.iter() {
-            if let Ok(mut transform) = bars.get_mut(child.clone()) {
-                transform.scale.x = (health.current / health.max) as f32;
-            }
+    for (player, health) in &player {
+        if let Some((mut transform, _)) = bars
+            .iter_mut()
+            .find(|(_, health_bar)| health_bar.0 == player)
+        {
+            transform.scale.x = (health.current / health.max) as f32;
         }
     }
 }

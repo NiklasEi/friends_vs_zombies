@@ -30,6 +30,7 @@ mod players;
 mod ui;
 
 const PLAYER_RADIUS: f32 = 0.5;
+const REVIVE_DISTANCE: f32 = 1.2;
 const ENEMY_RADIUS: f32 = 0.5;
 const BULLET_RADIUS: f32 = 0.025;
 const MAP_SIZE: i32 = 41;

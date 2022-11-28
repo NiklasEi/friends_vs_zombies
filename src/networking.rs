@@ -1,10 +1,11 @@
 use crate::enemies::{kill_enemies, move_enemies, Enemy};
+use crate::input::GameInput;
 use crate::loading::{EnemyAssets, EnemyData, PlayerAssets};
 use crate::matchmaking::Seed;
 use crate::players::{AnimationTimer, Health};
 use crate::{
-    direction, fire, game_input, Bullet, GameState, ImageAssets, MoveDir, Player, Weapon,
-    BULLET_RADIUS, MAP_SIZE, PLAYER_RADIUS,
+    direction, game_input, Bullet, GameState, ImageAssets, MoveDir, Player, Weapon, BULLET_RADIUS,
+    MAP_SIZE, PLAYER_RADIUS, REVIVE_DISTANCE,
 };
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
@@ -56,7 +57,8 @@ impl Plugin for NetworkingPlugin {
                                         .after(move_players),
                                 )
                                 .with_system(kill_players.after(bullets_hitting_players))
-                                .with_system(end_game.after(kill_players)),
+                                .with_system(revive_players.after(kill_players))
+                                .with_system(end_game.after(revive_players)),
                         ),
                 ),
             )
@@ -97,7 +99,10 @@ fn interlude_timer(mut timer: ResMut<InterludeTimer>, mut state: ResMut<State<Ga
 }
 
 #[derive(Component)]
-pub struct HealthBar;
+pub struct HealthBar(pub(crate) Entity);
+
+#[derive(Component)]
+pub struct HealthBarParent;
 
 pub fn spawn_players(
     mut commands: Commands,
@@ -108,17 +113,19 @@ pub fn spawn_players(
     info!("Spawning players");
 
     for player in 0..session.num_players() {
-        commands
-            .spawn_bundle(SpriteSheetBundle {
-                transform: Transform {
-                    translation: Vec3::new(0., 0., 100.),
-                    scale: Vec3::splat(0.01),
-                    ..Default::default()
-                },
-                sprite: TextureAtlasSprite::new(0),
-                texture_atlas: player_assets.get_atlas(player).clone(),
+        let mut player_commands = commands.spawn_bundle(SpriteSheetBundle {
+            transform: Transform {
+                translation: Vec3::new(0., 0., 100.),
+                scale: Vec3::splat(0.01),
                 ..Default::default()
-            })
+            },
+            sprite: TextureAtlasSprite::new(0),
+            texture_atlas: player_assets.get_atlas(player).clone(),
+            ..Default::default()
+        });
+        let player_id = player_commands.id();
+
+        player_commands
             .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
             .insert(Player { handle: player })
             .insert(Weapon::new())
@@ -126,27 +133,73 @@ pub fn spawn_players(
             .insert(Health::new(500.))
             .insert(Rollback::new(rollback_id_provider.next_id()))
             .with_children(|parent| {
-                parent.spawn_bundle(SpriteBundle {
-                    sprite: Sprite {
-                        color: Color::DARK_GRAY,
-                        custom_size: Some(Vec2::new(100., 5.1)),
-                        ..default()
-                    },
-                    transform: Transform::from_translation(Vec3::new(0., 50., 1.)),
-                    ..default()
-                });
                 parent
-                    .spawn_bundle(SpriteBundle {
-                        sprite: Sprite {
-                            color: Color::RED,
-                            custom_size: Some(Vec2::new(100., 5.1)),
-                            ..default()
-                        },
-                        transform: Transform::from_translation(Vec3::new(0., 50., 2.)),
+                    .spawn_bundle(SpatialBundle {
+                        transform: Transform::from_translation(Vec3::new(0., 50., 0.)),
                         ..default()
                     })
-                    .insert(HealthBar);
+                    .insert(HealthBarParent)
+                    .with_children(|parent| {
+                        parent.spawn_bundle(SpriteBundle {
+                            sprite: Sprite {
+                                color: Color::DARK_GRAY,
+                                custom_size: Some(Vec2::new(100., 5.1)),
+                                ..default()
+                            },
+                            transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                            ..default()
+                        });
+                        parent
+                            .spawn_bundle(SpriteBundle {
+                                sprite: Sprite {
+                                    color: Color::RED,
+                                    custom_size: Some(Vec2::new(100., 5.1)),
+                                    ..default()
+                                },
+                                transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
+                                ..default()
+                            })
+                            .insert(HealthBar(player_id));
+                    });
             });
+    }
+}
+
+fn revive_players(
+    mut commands: Commands,
+    inputs: Res<Vec<(u8, InputStatus)>>,
+    mut dead_players: Query<(Entity, &mut Transform, &mut Health), (With<Dead>, With<Player>)>,
+    alive_players: Query<(&Player, &Transform), Without<Dead>>,
+    mut health_bars: Query<(&Parent, &mut Visibility), (With<HealthBarParent>, Without<Player>)>,
+) {
+    for (player, transform) in alive_players.iter() {
+        let (input, _) = inputs[player.handle];
+        if input.is_revive() {
+            if let Some((dead_player, mut dead_transform, mut health)) =
+                dead_players.iter_mut().reduce(|current, closest| {
+                    if transform.translation.distance(current.1.translation)
+                        < transform.translation.distance(closest.1.translation)
+                    {
+                        current
+                    } else {
+                        closest
+                    }
+                })
+            {
+                if transform.translation.distance(dead_transform.translation) > REVIVE_DISTANCE {
+                    continue;
+                }
+                commands.entity(dead_player).remove::<Dead>();
+                dead_transform.rotation = Quat::from_rotation_z(0.);
+                health.current = health.max * 0.8;
+                if let Some((_, mut visibility)) = health_bars
+                    .iter_mut()
+                    .find(|(parent, _)| parent.get() == dead_player)
+                {
+                    visibility.is_visible = true;
+                }
+            }
+        }
     }
 }
 
@@ -196,16 +249,20 @@ fn bullets_hitting_players(
 fn kill_players(
     mut commands: Commands,
     mut player_query: Query<
-        (Entity, &mut Transform, &mut Health, &Children),
-        (With<Player>, Without<Dead>),
+        (Entity, &mut Transform, &mut Health),
+        (With<Player>, Without<Dead>, Without<HealthBarParent>),
     >,
+    mut health_bars: Query<(&Parent, &mut Visibility), With<HealthBarParent>>,
 ) {
-    for (player, mut player_transform, mut health, children) in player_query.iter_mut() {
+    for (player, mut player_transform, mut health) in player_query.iter_mut() {
         if health.current <= 0. {
             health.current = 0.;
             commands.entity(player).insert(Dead);
-            for child in children {
-                commands.entity(*child).despawn_recursive();
+            if let Some((_, mut visibility)) = health_bars
+                .iter_mut()
+                .find(|(parent, _)| parent.get() == player)
+            {
+                visibility.is_visible = false;
             }
             player_transform.rotation = Quat::from_rotation_z(PI / 2.);
         }
@@ -327,17 +384,18 @@ fn spawn_enemy(
     enemy_index: i32,
 ) {
     let enemy = enemy_data.get(enemy_assets.get(enemy_index)).unwrap();
-    commands
-        .spawn_bundle(SpriteSheetBundle {
-            transform: Transform {
-                translation,
-                scale: Vec3::splat(0.01),
-                ..Default::default()
-            },
-            sprite: TextureAtlasSprite::new(0),
-            texture_atlas: enemy.texture_atlas.clone(),
+    let mut enemy_commands = commands.spawn_bundle(SpriteSheetBundle {
+        transform: Transform {
+            translation,
+            scale: Vec3::splat(0.01),
             ..Default::default()
-        })
+        },
+        sprite: TextureAtlasSprite::new(0),
+        texture_atlas: enemy.texture_atlas.clone(),
+        ..Default::default()
+    });
+    let enemy_id = enemy_commands.id();
+    enemy_commands
         .insert(Health::new(enemy.health))
         .insert(Enemy {
             damage: enemy.damage,
@@ -367,7 +425,7 @@ fn spawn_enemy(
                     transform: Transform::from_translation(Vec3::new(0., 50., 2.)),
                     ..default()
                 })
-                .insert(HealthBar);
+                .insert(HealthBar(enemy_id));
         });
 }
 
@@ -381,7 +439,7 @@ fn fire_bullets(
 ) {
     for (entity, transform, player, mut weapon, move_dir) in player_query.iter_mut() {
         let (input, _) = inputs[player.handle];
-        if fire(input) && weapon.shoot(&seed_frame) {
+        if input.is_fire() && weapon.shoot(&seed_frame) {
             commands
                 .spawn_bundle(SpriteBundle {
                     transform: Transform::from_translation(transform.translation.xy().extend(200.))
