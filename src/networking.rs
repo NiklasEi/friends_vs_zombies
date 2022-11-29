@@ -1,6 +1,7 @@
 use crate::enemies::{kill_enemies, move_enemies, Enemy};
 use crate::input::GameInput;
 use crate::loading::{EnemyAssets, EnemyData, PlayerAssets};
+use crate::map::setup;
 use crate::matchmaking::Seed;
 use crate::players::{AnimationTimer, Health};
 use crate::{
@@ -40,7 +41,9 @@ impl Plugin for NetworkingPlugin {
                             SystemSet::on_update(GameState::Interlude).with_system(interlude_timer),
                         )
                         .with_system_set(
-                            SystemSet::on_enter(GameState::InGame).with_system(spawn_players),
+                            SystemSet::on_enter(GameState::InGame)
+                                .with_system(spawn_players)
+                                .with_system(setup),
                         )
                         .with_system_set(
                             SystemSet::on_update(GameState::InGame)

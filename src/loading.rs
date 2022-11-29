@@ -42,6 +42,9 @@ pub struct GameData {
 pub struct ImageAssets {
     #[asset(path = "bullet.png")]
     pub bullet: Handle<Image>,
+    #[asset(texture_atlas(tile_size_x = 32., tile_size_y = 32., columns = 8, rows = 8))]
+    #[asset(path = "grass.png")]
+    pub grass: Handle<TextureAtlas>,
 }
 
 #[derive(AssetCollection)]

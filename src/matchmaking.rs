@@ -19,13 +19,13 @@ impl Plugin for MatchmakingPlugin {
             .add_system_set(
                 SystemSet::on_update(GameState::Matchmaking)
                     .with_system(wait_for_players)
-                    .with_system(build_ggrs_session)
-                    .with_system(handle_packets),
+                    .with_system(handle_packets.after(wait_for_players))
+                    .with_system(build_ggrs_session.after(handle_packets)),
             );
     }
 }
 
-const START: u8 = 1;
+const START: u8 = 3;
 
 fn start_matchbox_socket(
     mut commands: Commands,
@@ -152,21 +152,19 @@ fn build_ggrs_session(
         return;
     }
     if *game_mode == GameMode::Multi(true) {
-        if input.pressed(KeyCode::Return) || start_game.0 {
-            let seed = Seed([3, 4, 5]);
-            let packet = Box::new([START, seed.0[0], seed.0[1], seed.0[2]]);
-            commands.insert_resource(seed);
-            let socket_players = socket.as_ref().as_ref().unwrap().players();
-            for player in socket_players {
-                if let PlayerType::Remote(id) = player {
-                    socket.as_mut().as_mut().unwrap().send(packet.clone(), id);
-                }
-            }
-        } else {
+        if !input.pressed(KeyCode::Return) && !start_game.0 {
             return; // wait for more players
         }
     }
+    let seed = Seed([3, 4, 5]);
+    let packet = Box::new([START, seed.0[0], seed.0[1], seed.0[2]]);
+    commands.insert_resource(seed);
     let socket_players = socket.as_ref().as_ref().unwrap().players();
+    for player in &socket_players {
+        if let PlayerType::Remote(id) = player {
+            socket.as_mut().as_mut().unwrap().send(packet.clone(), id);
+        }
+    }
     let input_delay = if *game_mode == GameMode::Single { 0 } else { 2 };
 
     info!(

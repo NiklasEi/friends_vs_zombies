@@ -34,7 +34,6 @@ const REVIVE_DISTANCE: f32 = 1.2;
 const ENEMY_RADIUS: f32 = 0.5;
 const BULLET_RADIUS: f32 = 0.025;
 const MAP_SIZE: i32 = 41;
-const GRID_WIDTH: f32 = 0.05;
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 enum GameState {
