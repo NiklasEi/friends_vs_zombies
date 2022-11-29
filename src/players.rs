@@ -46,7 +46,7 @@ impl Weapon {
     pub fn new() -> Self {
         Weapon {
             fire_frame: 0,
-            frame_cooldown: 60,
+            frame_cooldown: 30,
         }
     }
 

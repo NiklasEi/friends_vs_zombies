@@ -455,7 +455,7 @@ fn fire_bullets(
                     ..default()
                 })
                 .insert(*move_dir)
-                .insert(Bullet::new(100., entity))
+                .insert(Bullet::new(50., entity))
                 .insert(Rollback::new(rip.next_id()));
         }
     }
