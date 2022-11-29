@@ -154,17 +154,19 @@ fn build_ggrs_session(
     if *game_mode == GameMode::Multi(true) {
         if !input.pressed(KeyCode::Return) && !start_game.0 {
             return; // wait for more players
+        } else {
+            let seed = Seed([3, 4, 5]);
+            let packet = Box::new([START, seed.0[0], seed.0[1], seed.0[2]]);
+            commands.insert_resource(seed);
+            let socket_players = socket.as_ref().as_ref().unwrap().players();
+            for player in socket_players {
+                if let PlayerType::Remote(id) = player {
+                    socket.as_mut().as_mut().unwrap().send(packet.clone(), id);
+                }
+            }
         }
     }
-    let seed = Seed([3, 4, 5]);
-    let packet = Box::new([START, seed.0[0], seed.0[1], seed.0[2]]);
-    commands.insert_resource(seed);
     let socket_players = socket.as_ref().as_ref().unwrap().players();
-    for player in &socket_players {
-        if let PlayerType::Remote(id) = player {
-            socket.as_mut().as_mut().unwrap().send(packet.clone(), id);
-        }
-    }
     let input_delay = if *game_mode == GameMode::Single { 0 } else { 2 };
 
     info!(
