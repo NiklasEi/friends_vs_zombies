@@ -27,9 +27,20 @@ impl Plugin for LoadingPlugin {
                     .with_collection::<GameData>()
                     .with_collection::<PlayerAssets>()
                     .with_collection::<EnemyAssets>()
+                    .with_collection::<AudioAssets>()
                     .continue_to_state(GameState::Menu),
             );
     }
+}
+
+#[derive(AssetCollection)]
+pub struct AudioAssets {
+    #[asset(path = "audio/enemy_fall.ogg")]
+    pub enemy_fall: Handle<AudioSource>,
+    #[asset(path = "audio/player_hit.ogg")]
+    pub player_hit: Handle<AudioSource>,
+    #[asset(path = "audio/player_hit_bullet.ogg")]
+    pub player_hit_bullet: Handle<AudioSource>,
 }
 
 #[derive(AssetCollection)]

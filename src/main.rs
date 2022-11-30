@@ -4,7 +4,9 @@
 
 extern crate core;
 
+use crate::audio::AudioPlugin;
 use crate::enemies::EnemiesPlugin;
+use crate::events::EventsPlugin;
 use crate::loading::{ImageAssets, LoadingPlugin};
 use crate::map::MapPlugin;
 use crate::matchmaking::MatchmakingPlugin;
@@ -19,7 +21,9 @@ use input::*;
 use std::io::Cursor;
 use winit::window::Icon;
 
+mod audio;
 mod enemies;
+mod events;
 mod input;
 mod loading;
 mod map;
@@ -92,8 +96,10 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(LoadingPlugin)
         .add_plugin(PlayersPlugin)
+        .add_plugin(AudioPlugin)
         .add_plugin(NetworkingPlugin)
         .add_plugin(MatchmakingPlugin)
+        .add_plugin(EventsPlugin)
         .add_plugin(MenuPlugin)
         .add_plugin(UiPlugin)
         .add_plugin(MapPlugin)

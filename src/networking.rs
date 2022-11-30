@@ -1,4 +1,4 @@
-use crate::enemies::{kill_enemies, move_enemies, Enemy};
+use crate::enemies::{kill_enemies, move_enemies, Enemy, FvzEvent, RollbackSafeEvents, SafeEvent};
 use crate::input::GameInput;
 use crate::loading::{EnemyAssets, EnemyData, PlayerAssets};
 use crate::matchmaking::Seed;
@@ -237,16 +237,27 @@ fn bullets_hitting_players(
         (Entity, &Transform, &mut Health),
         (With<Player>, Without<Bullet>, Without<Dead>),
     >,
-    mut bullet_query: Query<(&Transform, &mut Bullet)>,
+    mut bullet_query: Query<(Entity, &Transform, &mut Bullet)>,
+    mut rollback_safe_events: ResMut<RollbackSafeEvents>,
 ) {
-    for (player, player_transform, mut health) in player_query.iter_mut() {
-        for (bullet_transform, mut bullet) in bullet_query.iter_mut() {
+    'bullets: for (bullet_entity, bullet_transform, mut bullet) in bullet_query.iter_mut() {
+        if bullet.is_used_up() {
+            continue;
+        }
+        for (player, player_transform, mut health) in player_query.iter_mut() {
             let distance = Vec2::distance(
                 player_transform.translation.xy(),
                 bullet_transform.translation.xy(),
             );
             if distance < PLAYER_RADIUS + BULLET_RADIUS && bullet.hit(player) {
+                rollback_safe_events.0.push(SafeEvent::new(
+                    FvzEvent::PlayerHitBullet,
+                    (3 * bullet_entity.id()).wrapping_add(player.id()),
+                ));
                 health.current -= bullet.damage;
+                if bullet.is_used_up() {
+                    continue 'bullets;
+                }
             }
         }
     }
@@ -458,7 +469,7 @@ fn fire_bullets(
                     ..default()
                 })
                 .insert(*move_dir)
-                .insert(Bullet::fire(50., entity))
+                .insert(Bullet::fire(500., entity))
                 .insert(Rollback::new(rip.next_id()));
         }
     }
