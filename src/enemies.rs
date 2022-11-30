@@ -23,9 +23,8 @@ pub fn kill_enemies(
     mut enemy_query: Query<(Entity, &Transform, &mut Health), (With<Enemy>, Without<Bullet>)>,
     mut bullet_query: Query<(Entity, &Transform, &mut Bullet)>,
 ) {
-    for (enemy, enemy_transform, mut health) in enemy_query.iter_mut() {
-        // Todo: despawn bullets
-        for (_bullet_entity, bullet_transform, mut bullet) in bullet_query.iter_mut() {
+    'bullets: for (bullet_entity, bullet_transform, mut bullet) in bullet_query.iter_mut() {
+        for (enemy, enemy_transform, mut health) in enemy_query.iter_mut() {
             let distance = Vec2::distance(
                 enemy_transform.translation.xy(),
                 bullet_transform.translation.xy(),
@@ -35,6 +34,10 @@ pub fn kill_enemies(
                 if health.current <= 0. {
                     commands.entity(enemy).despawn_recursive();
                 }
+            }
+            if bullet.is_used_up() {
+                commands.entity(bullet_entity).despawn_recursive();
+                continue 'bullets;
             }
         }
     }

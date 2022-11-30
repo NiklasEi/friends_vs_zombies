@@ -47,13 +47,17 @@ enum GameState {
 #[derive(Component, Reflect, Default)]
 pub struct Bullet {
     damage: f64,
+    max_hits: usize,
     already_hit: Vec<Entity>,
 }
 
+pub struct Score(pub u64);
+
 impl Bullet {
-    pub fn new(damage: f64, shooter: Entity) -> Self {
+    pub fn fire(damage: f64, shooter: Entity) -> Self {
         Bullet {
             damage,
+            max_hits: 1,
             already_hit: vec![shooter],
         }
     }
@@ -64,6 +68,10 @@ impl Bullet {
         }
         self.already_hit.push(entity);
         true
+    }
+
+    pub fn is_used_up(&self) -> bool {
+        self.already_hit.len() > self.max_hits
     }
 }
 
@@ -80,6 +88,7 @@ fn main() {
         })
         .add_startup_system(set_window_icon)
         .init_resource::<InterludeTimer>()
+        .insert_resource(Score(0))
         .add_plugins(DefaultPlugins)
         .add_plugin(LoadingPlugin)
         .add_plugin(PlayersPlugin)

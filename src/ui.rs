@@ -3,7 +3,7 @@ use crate::matchmaking::{LocalPlayer, RemotePlayers, StartGame};
 use crate::menu::{ButtonColors, GameCode};
 use crate::networking::HealthBar;
 use crate::players::Health;
-use crate::{GameMode, GameState};
+use crate::{GameMode, GameState, Score};
 use bevy::prelude::*;
 
 pub struct UiPlugin;
@@ -20,7 +20,12 @@ impl Plugin for UiPlugin {
                 .with_system(update_player_list)
                 .with_system(click_start_button),
         )
-        .add_system_set(SystemSet::on_update(GameState::InGame).with_system(update_health_bars))
+        .add_system_set(SystemSet::on_enter(GameState::InGame).with_system(prepare_game_ui))
+        .add_system_set(
+            SystemSet::on_update(GameState::InGame)
+                .with_system(update_health_bars)
+                .with_system(update_score),
+        )
         .add_system_set(
             SystemSet::on_exit(GameState::Matchmaking).with_system(remove_matchmaking_only_ui),
         );
@@ -72,6 +77,9 @@ struct MatchmakingOnly;
 #[derive(Component)]
 struct StartButton;
 
+#[derive(Component)]
+struct RootNode;
+
 fn prepare_matchmaking_ui(
     mut commands: Commands,
     font_assets: Res<FontAssets>,
@@ -92,6 +100,7 @@ fn prepare_matchmaking_ui(
             color: UiColor(Color::NONE),
             ..default()
         })
+        .insert(RootNode)
         .with_children(|parent| {
             if *game_mode == GameMode::Multi(true) {
                 parent
@@ -183,6 +192,52 @@ fn prepare_matchmaking_ui(
                 })
                 .insert(MatchmakingOnly);
         });
+}
+
+#[derive(Component)]
+struct ScoreText;
+
+fn prepare_game_ui(
+    root_node: Query<Entity, With<RootNode>>,
+    mut commands: Commands,
+    font_assets: Res<FontAssets>,
+) {
+    commands.entity(root_node.single()).with_children(|parent| {
+        parent
+            .spawn_bundle(TextBundle {
+                style: Style {
+                    position_type: PositionType::Absolute,
+                    position: UiRect {
+                        top: Val::Px(15.),
+                        left: Val::Px(15.),
+                        ..default()
+                    },
+                    ..default()
+                },
+                text: Text {
+                    sections: vec![TextSection {
+                        value: "Score: 0".to_owned(),
+                        style: TextStyle {
+                            font: font_assets.fira_sans.clone(),
+                            font_size: 40.0,
+                            color: Color::rgb(0.9, 0.9, 0.9),
+                        },
+                    }],
+                    alignment: TextAlignment::CENTER,
+                },
+                ..Default::default()
+            })
+            .insert(ScoreText);
+    });
+}
+
+fn update_score(score: Res<Score>, mut score_text: Query<&mut Text, With<ScoreText>>) {
+    if !score.is_changed() {
+        return;
+    }
+    if let Ok(mut text) = score_text.get_single_mut() {
+        text.sections[0].value = format!("Score: {}", score.0);
+    }
 }
 
 fn remove_matchmaking_only_ui(mut commands: Commands, ui: Query<Entity, With<MatchmakingOnly>>) {

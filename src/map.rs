@@ -1,6 +1,7 @@
 use crate::loading::ImageAssets;
 use crate::matchmaking::Seed;
-use crate::MAP_SIZE;
+use crate::{GameState, MAP_SIZE};
+use bevy::ecs::system::SystemState;
 use bevy::prelude::*;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -8,18 +9,24 @@ use rand_chacha::ChaCha8Rng;
 pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
-    fn build(&self, _app: &mut App) {
-        // app.add_system_set(SystemSet::on_enter(GameState::InGame).with_system(setup));
+    fn build(&self, app: &mut App) {
+        app.add_system_set(
+            SystemSet::on_exit(GameState::Matchmaking)
+                .with_system(setup.exclusive_system().at_end()),
+        );
     }
 }
 
-pub fn setup(mut commands: Commands, images: Res<ImageAssets>, seed: Res<Seed>) {
+pub fn setup(world: &mut World) {
+    let mut state: SystemState<(Res<ImageAssets>, Res<Seed>)> = SystemState::new(world);
+    let (images, seed) = state.get(world);
     info!("build map");
     let seed: [u8; 32] = [seed.0[1], seed.0[2]].repeat(16).try_into().unwrap();
     let mut rng = ChaCha8Rng::from_seed(seed);
+    let texture = images.grass.clone();
     for row in 0..=MAP_SIZE {
         for column in 0..=MAP_SIZE {
-            commands.spawn_bundle(SpriteSheetBundle {
+            world.spawn().insert_bundle(SpriteSheetBundle {
                 transform: Transform {
                     translation: Vec3::new(
                         column as f32 - MAP_SIZE as f32 / 2.,
@@ -33,7 +40,7 @@ pub fn setup(mut commands: Commands, images: Res<ImageAssets>, seed: Res<Seed>) 
                     index: rng.gen_range(0..32),
                     ..default()
                 },
-                texture_atlas: images.grass.clone(),
+                texture_atlas: texture.clone(),
                 ..default()
             });
         }

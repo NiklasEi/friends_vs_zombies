@@ -166,6 +166,10 @@ fn build_ggrs_session(
             }
         }
     }
+    if *game_mode == GameMode::Single {
+        let seed = Seed([3, 4, 5]);
+        commands.insert_resource(seed);
+    }
     let socket_players = socket.as_ref().as_ref().unwrap().players();
     let input_delay = if *game_mode == GameMode::Single { 0 } else { 2 };
 
