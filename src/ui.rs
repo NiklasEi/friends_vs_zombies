@@ -254,6 +254,7 @@ pub fn update_health_bars(
             .find(|(_, health_bar)| health_bar.0 == player)
         {
             transform.scale.x = (health.current / health.max) as f32;
+            transform.translation.x = 50. * (health.current / health.max) as f32 - 50.;
         }
     }
 }
