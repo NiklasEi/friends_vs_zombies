@@ -7,9 +7,11 @@ pub struct AudioPlugin;
 
 impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<AudioEvent>().add_system_set(
-            SystemSet::on_update(GameState::InGame).with_system(enemy_falls.after(propagate)),
-        );
+        app.add_event::<AudioEvent>()
+            .add_system_set(
+                SystemSet::on_update(GameState::InGame).with_system(enemy_falls.after(propagate)),
+            )
+            .add_system_set(SystemSet::on_enter(GameState::Menu).with_system(start_background));
     }
 }
 
@@ -20,6 +22,13 @@ pub enum AudioEvent {
     Lost,
     Pew,
     Revive,
+}
+
+fn start_background(audio: Res<Audio>, sound: Res<AudioAssets>) {
+    audio.play_with_settings(
+        sound.background.clone(),
+        PlaybackSettings::LOOP.with_volume(0.5),
+    );
 }
 
 fn enemy_falls(mut events: EventReader<AudioEvent>, sound: Res<AudioAssets>, audio: Res<Audio>) {

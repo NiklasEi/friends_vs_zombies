@@ -35,6 +35,8 @@ impl Plugin for LoadingPlugin {
 
 #[derive(AssetCollection)]
 pub struct AudioAssets {
+    #[asset(path = "audio/background.ogg")]
+    pub background: Handle<AudioSource>,
     #[asset(path = "audio/enemy_fall.ogg")]
     pub enemy_fall: Handle<AudioSource>,
     #[asset(path = "audio/player_hit.ogg")]
