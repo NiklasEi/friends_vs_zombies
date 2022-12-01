@@ -55,7 +55,7 @@ pub struct Bullet {
     already_hit: Vec<Entity>,
 }
 
-pub struct Score(pub u64);
+pub struct Score(pub f64);
 
 impl Bullet {
     pub fn fire(damage: f64, shooter: Entity) -> Self {
@@ -92,7 +92,7 @@ fn main() {
         })
         .add_startup_system(set_window_icon)
         .init_resource::<InterludeTimer>()
-        .insert_resource(Score(0))
+        .insert_resource(Score(0.))
         .add_plugins(DefaultPlugins)
         .add_plugin(LoadingPlugin)
         .add_plugin(PlayersPlugin)

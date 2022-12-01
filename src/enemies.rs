@@ -1,6 +1,6 @@
 use crate::networking::{Dead, SeedFrame};
 use crate::players::{Health, Player};
-use crate::{Bullet, BULLET_RADIUS, ENEMY_RADIUS, PLAYER_RADIUS};
+use crate::{Bullet, Score, BULLET_RADIUS, ENEMY_RADIUS, PLAYER_RADIUS};
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
 
@@ -47,6 +47,7 @@ pub struct RollbackSafeEvents(pub(crate) Vec<SafeEvent>);
 
 pub fn kill_enemies(
     mut commands: Commands,
+    mut score: ResMut<Score>,
     mut enemy_query: Query<(Entity, &Transform, &mut Health), (With<Enemy>, Without<Bullet>)>,
     mut bullet_query: Query<(Entity, &Transform, &mut Bullet)>,
     mut rollback_safe_events: ResMut<RollbackSafeEvents>,
@@ -61,6 +62,7 @@ pub fn kill_enemies(
                 bullet_transform.translation.xy(),
             );
             if distance < ENEMY_RADIUS + BULLET_RADIUS && bullet.hit(enemy) {
+                score.0 += bullet.damage;
                 health.current = (health.current - bullet.damage).max(0.);
                 if health.current <= 0. {
                     rollback_safe_events.0.push(SafeEvent::new(

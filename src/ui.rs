@@ -1,10 +1,12 @@
-use crate::loading::FontAssets;
+use crate::loading::{FontAssets, PlayerAssets};
 use crate::matchmaking::{LocalPlayer, RemotePlayers, StartGame};
 use crate::menu::{ButtonColors, GameCode};
-use crate::networking::HealthBar;
-use crate::players::Health;
+use crate::networking::{Dead, HealthBar};
+use crate::players::{Health, Player};
 use crate::{GameMode, GameState, Score};
+use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
+use bevy::render::camera::RenderTarget;
 
 pub struct UiPlugin;
 
@@ -20,11 +22,12 @@ impl Plugin for UiPlugin {
                 .with_system(update_player_list)
                 .with_system(click_start_button),
         )
-        .add_system_set(SystemSet::on_enter(GameState::InGame).with_system(prepare_game_ui))
+        .add_system_set(SystemSet::on_exit(GameState::Matchmaking).with_system(prepare_game_ui))
         .add_system_set(
             SystemSet::on_update(GameState::InGame)
                 .with_system(update_health_bars)
-                .with_system(update_score),
+                .with_system(update_score)
+                .with_system(move_player_markers),
         )
         .add_system_set(
             SystemSet::on_exit(GameState::Matchmaking).with_system(remove_matchmaking_only_ui),
@@ -95,6 +98,8 @@ fn prepare_matchmaking_ui(
                     height: Val::Percent(100.),
                 },
                 flex_direction: FlexDirection::ColumnReverse,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
                 ..default()
             },
             color: UiColor(Color::NONE),
@@ -103,6 +108,22 @@ fn prepare_matchmaking_ui(
         .insert(RootNode)
         .with_children(|parent| {
             if *game_mode == GameMode::Multi(true) {
+                parent.spawn_bundle(TextBundle {
+                    text: Text {
+                        sections: vec![TextSection {
+                            value:
+                            "Depending on your network,\nwait for up to one minute\nuntil all players are listed"
+                                .to_owned(),
+                            style: TextStyle {
+                                font: font_assets.fira_sans.clone(),
+                                font_size: 40.0,
+                                color: Color::rgb(0.9, 0.9, 0.9),
+                            },
+                        }],
+                        alignment: TextAlignment::CENTER,
+                    },
+                    ..Default::default()
+                }).insert(MatchmakingOnly);
                 parent
                     .spawn_bundle(ButtonBundle {
                         style: Style {
@@ -197,38 +218,32 @@ fn prepare_matchmaking_ui(
 #[derive(Component)]
 struct ScoreText;
 
-fn prepare_game_ui(
-    root_node: Query<Entity, With<RootNode>>,
-    mut commands: Commands,
-    font_assets: Res<FontAssets>,
-) {
-    commands.entity(root_node.single()).with_children(|parent| {
-        parent
-            .spawn_bundle(TextBundle {
-                style: Style {
-                    position_type: PositionType::Absolute,
-                    position: UiRect {
-                        top: Val::Px(15.),
-                        left: Val::Px(15.),
-                        ..default()
-                    },
+fn prepare_game_ui(mut commands: Commands, font_assets: Res<FontAssets>) {
+    commands
+        .spawn_bundle(TextBundle {
+            style: Style {
+                position_type: PositionType::Absolute,
+                position: UiRect {
+                    top: Val::Px(15.),
+                    left: Val::Px(15.),
                     ..default()
                 },
-                text: Text {
-                    sections: vec![TextSection {
-                        value: "Score: 0".to_owned(),
-                        style: TextStyle {
-                            font: font_assets.fira_sans.clone(),
-                            font_size: 40.0,
-                            color: Color::rgb(0.9, 0.9, 0.9),
-                        },
-                    }],
-                    alignment: TextAlignment::CENTER,
-                },
-                ..Default::default()
-            })
-            .insert(ScoreText);
-    });
+                ..default()
+            },
+            text: Text {
+                sections: vec![TextSection {
+                    value: "Score: 0".to_owned(),
+                    style: TextStyle {
+                        font: font_assets.fira_sans.clone(),
+                        font_size: 40.0,
+                        color: Color::rgb(0.9, 0.9, 0.9),
+                    },
+                }],
+                alignment: TextAlignment::CENTER,
+            },
+            ..Default::default()
+        })
+        .insert(ScoreText);
 }
 
 fn update_score(score: Res<Score>, mut score_text: Query<&mut Text, With<ScoreText>>) {
@@ -296,6 +311,71 @@ fn update_player_list(
                 },
             })
         }
+    }
+}
+
+#[derive(Component, Reflect)]
+pub struct PlayerMarker(pub Entity);
+
+impl Default for PlayerMarker {
+    fn default() -> Self {
+        PlayerMarker(Entity::from_raw(0))
+    }
+}
+
+fn move_player_markers(
+    mut player_query: Query<(Entity, &Transform), (With<Player>, Without<PlayerMarker>)>,
+    mut markers: Query<(
+        &mut Transform,
+        &PlayerMarker,
+        &mut Visibility,
+        &mut Handle<Image>,
+    )>,
+    dead: Query<&Dead>,
+    windows: Res<Windows>,
+    images: Res<PlayerAssets>,
+    camera: Query<(&Camera, &Transform), (Without<Player>, Without<PlayerMarker>)>,
+) {
+    let (camera, center) = camera.single();
+    let window = if let RenderTarget::Window(id) = camera.target {
+        windows.get(id).unwrap()
+    } else {
+        windows.get_primary().unwrap()
+    };
+
+    let width = 10.;
+    let height = 10. * (window.height() / window.width());
+    for (mut marker_transform, marker, mut visibility, mut image) in markers.iter_mut() {
+        let Ok((player_entity, player_transform)) = player_query.get_mut(marker.0) else {
+            warn!("No player for marker O.o");
+            continue;
+        };
+        if (center.translation.x - player_transform.translation.x).abs() < width
+            && (center.translation.y - player_transform.translation.y).abs() < height
+        {
+            visibility.is_visible = false;
+            continue;
+        }
+        if dead.contains(player_entity) {
+            *image = images.marker_red.clone();
+        } else {
+            *image = images.marker.clone();
+        }
+        visibility.is_visible = true;
+        let centered_position = (player_transform.translation.clone() - center.translation).xy();
+        let angle = centered_position.angle_between(Vec2::X);
+        marker_transform.rotation = Quat::from_rotation_z(-angle);
+        let factor_x = (centered_position.x / width).abs();
+        let factor_y = (centered_position.y / height).abs();
+        let factor = if factor_x > factor_y {
+            factor_x
+        } else {
+            factor_y
+        };
+        marker_transform.translation.x =
+            center.translation.x + centered_position.x / (1.7 * factor);
+        marker_transform.translation.y =
+            center.translation.y + centered_position.y / (1.7 * factor);
     }
 }
 

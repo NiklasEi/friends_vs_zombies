@@ -60,6 +60,10 @@ pub struct ImageAssets {
 
 #[derive(AssetCollection)]
 pub struct PlayerAssets {
+    #[asset(path = "players/marker.png")]
+    pub marker: Handle<Image>,
+    #[asset(path = "players/marker_red.png")]
+    pub marker_red: Handle<Image>,
     #[asset(texture_atlas(tile_size_x = 96., tile_size_y = 96., columns = 4, rows = 1))]
     #[asset(path = "players/player1.png")]
     pub player1: Handle<TextureAtlas>,

@@ -3,6 +3,7 @@ use crate::input::GameInput;
 use crate::loading::{EnemyAssets, EnemyData, PlayerAssets};
 use crate::matchmaking::Seed;
 use crate::players::{AnimationTimer, Health};
+use crate::ui::PlayerMarker;
 use crate::{
     direction, game_input, Bullet, GameState, ImageAssets, MoveDir, Player, Score, Weapon,
     BULLET_RADIUS, MAP_SIZE, PLAYER_RADIUS, REVIVE_DISTANCE,
@@ -71,6 +72,7 @@ impl Plugin for NetworkingPlugin {
             .register_rollback_type::<MoveDir>()
             .register_rollback_type::<EnemyTimer>()
             .register_rollback_type::<Dead>()
+            .register_rollback_type::<PlayerMarker>()
             .build(app);
     }
 }
@@ -164,11 +166,26 @@ pub fn spawn_players(
                             .insert(HealthBar(player_id));
                     });
             });
+
+        info!("spawn marker");
+        commands
+            .spawn_bundle(SpriteBundle {
+                transform: {
+                    let mut transform = Transform::from_translation(Vec3::new(0., 0., 101.));
+                    transform.scale = Vec3::splat(0.01);
+
+                    transform
+                },
+                texture: player_assets.marker.clone(),
+                visibility: Visibility { is_visible: true },
+                ..default()
+            })
+            .insert(PlayerMarker(player_id));
     }
 }
 
 fn reset_score(mut score: ResMut<Score>) {
-    score.0 = 0;
+    score.0 = 0.;
 }
 
 fn revive_players(
@@ -220,6 +237,7 @@ fn remove_entities(
     player_query: Query<Entity, With<Player>>,
     bullet_query: Query<Entity, With<Bullet>>,
     enemy_query: Query<Entity, With<Enemy>>,
+    marker_query: Query<Entity, With<PlayerMarker>>,
 ) {
     for player in player_query.iter() {
         commands.entity(player).despawn_recursive();
@@ -230,9 +248,13 @@ fn remove_entities(
     for enemy in enemy_query.iter() {
         commands.entity(enemy).despawn_recursive();
     }
+    for marker in marker_query.iter() {
+        commands.entity(marker).despawn_recursive();
+    }
 }
 
 fn bullets_hitting_players(
+    mut commands: Commands,
     mut player_query: Query<
         (Entity, &Transform, &mut Health),
         (With<Player>, Without<Bullet>, Without<Dead>),
@@ -256,6 +278,7 @@ fn bullets_hitting_players(
                 ));
                 health.current -= bullet.damage;
                 if bullet.is_used_up() {
+                    commands.entity(bullet_entity).despawn_recursive();
                     continue 'bullets;
                 }
             }
