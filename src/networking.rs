@@ -194,6 +194,7 @@ fn revive_players(
     mut dead_players: Query<(Entity, &mut Transform, &mut Health), (With<Dead>, With<Player>)>,
     alive_players: Query<(&Player, &Transform), Without<Dead>>,
     mut health_bars: Query<(&Parent, &mut Visibility), (With<HealthBarParent>, Without<Player>)>,
+    mut rollback_safe_events: ResMut<RollbackSafeEvents>,
 ) {
     for (player, transform) in alive_players.iter() {
         let (input, _) = inputs[player.handle];
@@ -212,6 +213,10 @@ fn revive_players(
                 if transform.translation.distance(dead_transform.translation) > REVIVE_DISTANCE {
                     continue;
                 }
+                rollback_safe_events.0.push(SafeEvent::new(
+                    FvzEvent::Revive,
+                    (5 * dead_player.id()).wrapping_add(player.handle as u32),
+                ));
                 commands.entity(dead_player).remove::<Dead>();
                 dead_transform.rotation = Quat::from_rotation_z(0.);
                 health.current = health.max * 0.8;
@@ -226,8 +231,15 @@ fn revive_players(
     }
 }
 
-fn end_game(alive_players: Query<&Player, Without<Dead>>, mut state: ResMut<State<GameState>>) {
+fn end_game(
+    alive_players: Query<&Player, Without<Dead>>,
+    mut state: ResMut<State<GameState>>,
+    mut rollback_safe_events: ResMut<RollbackSafeEvents>,
+) {
     if alive_players.is_empty() {
+        rollback_safe_events
+            .0
+            .push(SafeEvent::new(FvzEvent::Lost, 0));
         state.set(GameState::Interlude).unwrap();
     }
 }
@@ -476,10 +488,15 @@ fn fire_bullets(
     seed_frame: Res<SeedFrame>,
     mut player_query: Query<(Entity, &Transform, &Player, &mut Weapon, &MoveDir), Without<Dead>>,
     mut rip: ResMut<RollbackIdProvider>,
+    mut rollback_safe_events: ResMut<RollbackSafeEvents>,
 ) {
     for (entity, transform, player, mut weapon, move_dir) in player_query.iter_mut() {
         let (input, _) = inputs[player.handle];
         if input.is_fire() && weapon.shoot(&seed_frame) {
+            rollback_safe_events.0.push(SafeEvent::new(
+                FvzEvent::Pew,
+                (2 * entity.id()).wrapping_add(seed_frame.0),
+            ));
             commands
                 .spawn_bundle(SpriteBundle {
                     transform: Transform::from_translation(transform.translation.xy().extend(200.))

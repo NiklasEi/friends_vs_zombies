@@ -2,7 +2,7 @@
 name = "friends_vs_zombies"
 version = "0.1.0"
 edition = "2021"
-exclude = ["dist", "build", "assets", "credits"]
+exclude = ["dist", "build", "assets", "credits", "resources"]
 
 [dependencies]
 bevy = "0.8"

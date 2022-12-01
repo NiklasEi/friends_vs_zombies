@@ -41,6 +41,12 @@ pub struct AudioAssets {
     pub player_hit: Handle<AudioSource>,
     #[asset(path = "audio/player_hit_bullet.ogg")]
     pub player_hit_bullet: Handle<AudioSource>,
+    #[asset(path = "audio/lost.ogg")]
+    pub lost: Handle<AudioSource>,
+    #[asset(path = "audio/pew.ogg")]
+    pub pew: Handle<AudioSource>,
+    #[asset(path = "audio/revive.ogg")]
+    pub revive: Handle<AudioSource>,
 }
 
 #[derive(AssetCollection)]

@@ -40,6 +40,9 @@ pub enum FvzEvent {
     EnemyFall,
     PlayerHit,
     PlayerHitBullet,
+    Lost,
+    Pew,
+    Revive,
 }
 
 #[derive(Default)]

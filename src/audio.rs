@@ -17,6 +17,9 @@ pub enum AudioEvent {
     EnemyFall,
     PlayerHit,
     PlayerHitBullet,
+    Lost,
+    Pew,
+    Revive,
 }
 
 fn enemy_falls(mut events: EventReader<AudioEvent>, sound: Res<AudioAssets>, audio: Res<Audio>) {
@@ -25,6 +28,9 @@ fn enemy_falls(mut events: EventReader<AudioEvent>, sound: Res<AudioAssets>, aud
             AudioEvent::EnemyFall => audio.play(sound.enemy_fall.clone()),
             AudioEvent::PlayerHit => audio.play(sound.player_hit.clone()),
             AudioEvent::PlayerHitBullet => audio.play(sound.player_hit_bullet.clone()),
+            AudioEvent::Lost => audio.play(sound.lost.clone()),
+            AudioEvent::Pew => audio.play(sound.pew.clone()),
+            AudioEvent::Revive => audio.play(sound.revive.clone()),
         };
     }
 }

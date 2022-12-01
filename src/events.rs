@@ -29,6 +29,9 @@ pub fn propagate(
             FvzEvent::EnemyFall => audio_events.send(AudioEvent::EnemyFall),
             FvzEvent::PlayerHit => audio_events.send(AudioEvent::PlayerHit),
             FvzEvent::PlayerHitBullet => audio_events.send(AudioEvent::PlayerHitBullet),
+            FvzEvent::Lost => audio_events.send(AudioEvent::Lost),
+            FvzEvent::Pew => audio_events.send(AudioEvent::Pew),
+            FvzEvent::Revive => audio_events.send(AudioEvent::Revive),
         }
     }
     events_cache
