@@ -114,8 +114,6 @@ pub fn spawn_players(
     player_assets: Res<PlayerAssets>,
     session: Res<P2PSession<GgrsConfig>>,
 ) {
-    info!("Spawning players");
-
     for player in 0..session.num_players() {
         let mut player_commands = commands.spawn_bundle(SpriteSheetBundle {
             transform: Transform {
@@ -134,7 +132,7 @@ pub fn spawn_players(
             .insert(Player { handle: player })
             .insert(Weapon::new())
             .insert(MoveDir(-Vec2::X))
-            .insert(Health::new(500.))
+            .insert(Health::new(510.))
             .insert(Rollback::new(rollback_id_provider.next_id()))
             .with_children(|parent| {
                 parent
@@ -509,7 +507,7 @@ fn fire_bullets(
                     ..default()
                 })
                 .insert(*move_dir)
-                .insert(Bullet::fire(500., entity))
+                .insert(Bullet::fire(50., entity))
                 .insert(Rollback::new(rip.next_id()));
         }
     }

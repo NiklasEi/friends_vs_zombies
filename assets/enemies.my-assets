@@ -4,13 +4,13 @@
         speed: 0.07,
         damage: 10.,
         attack_cooldown: 30,
-        health: 300.,
+        health: 200.,
     ),
     "devil": Enemy (
         sprite_sheet: "enemies/enemy2.png",
         speed: 0.05,
-        damage: 20.,
+        damage: 30.,
         attack_cooldown: 60,
-        health: 500.,
+        health: 400.,
     )
 })
