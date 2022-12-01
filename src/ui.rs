@@ -1,4 +1,4 @@
-use crate::loading::{FontAssets, PlayerAssets};
+use crate::loading::{FontAssets, ImageAssets, PlayerAssets};
 use crate::matchmaking::{LocalPlayer, RemotePlayers, StartGame};
 use crate::menu::{ButtonColors, GameCode};
 use crate::networking::{Dead, HealthBar};
@@ -86,6 +86,7 @@ struct RootNode;
 fn prepare_matchmaking_ui(
     mut commands: Commands,
     font_assets: Res<FontAssets>,
+    image_assets: Res<ImageAssets>,
     game_mode: Res<GameMode>,
     game_code: Res<GameCode>,
     button_colors: Res<ButtonColors>,
@@ -186,6 +187,15 @@ fn prepare_matchmaking_ui(
                         });
                     });
             }
+
+            parent.spawn_bundle(ImageBundle {
+                image: UiImage(image_assets.control.clone()),
+                transform: Transform {
+                    scale: Vec3::splat(0.5),
+                    ..default()
+                },
+                ..default()
+            }).insert(MatchmakingOnly);
 
             parent
                 .spawn_bundle(TextBundle {
