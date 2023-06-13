@@ -45,7 +45,7 @@ pub enum FvzEvent {
     Revive,
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub struct RollbackSafeEvents(pub(crate) Vec<SafeEvent>);
 
 pub fn kill_enemies(
@@ -70,7 +70,7 @@ pub fn kill_enemies(
                 if health.current <= 0. {
                     rollback_safe_events.0.push(SafeEvent::new(
                         FvzEvent::EnemyFall,
-                        enemy.id().wrapping_add(enemy.generation()),
+                        enemy.index().wrapping_add(enemy.generation()),
                     ));
                     commands.entity(enemy).despawn_recursive();
                 }
@@ -115,7 +115,7 @@ pub fn move_enemies(
                 if enemy.last_attack + enemy.attack_cooldown < seed_frame.0 {
                     rollback_safe_events.0.push(SafeEvent::new(
                         FvzEvent::PlayerHit,
-                        (3 * player.id()).wrapping_add(enemy_entity.id()),
+                        (3 * player.index()).wrapping_add(enemy_entity.index()),
                     ));
 
                     enemy.last_attack = seed_frame.0;

@@ -10,10 +10,7 @@ pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_exit(GameState::Matchmaking)
-                .with_system(setup.exclusive_system().at_end()),
-        );
+        app.add_system(setup.in_schedule(OnExit(GameState::Matchmaking)));
     }
 }
 
@@ -26,7 +23,7 @@ pub fn setup(world: &mut World) {
     let texture = images.grass.clone();
     for row in 0..=MAP_SIZE {
         for column in 0..=MAP_SIZE {
-            world.spawn().insert_bundle(SpriteSheetBundle {
+            world.spawn(SpriteSheetBundle {
                 transform: Transform {
                     translation: Vec3::new(
                         column as f32 - MAP_SIZE as f32 / 2.,

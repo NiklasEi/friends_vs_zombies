@@ -8,10 +8,12 @@ pub struct AudioPlugin;
 impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<AudioEvent>()
-            .add_system_set(
-                SystemSet::on_update(GameState::InGame).with_system(enemy_falls.after(propagate)),
+            .add_system(
+                enemy_falls
+                    .after(propagate)
+                    .run_if(in_state(GameState::InGame)),
             )
-            .add_system_set(SystemSet::on_enter(GameState::Menu).with_system(start_background));
+            .add_system(start_background.in_schedule(OnEnter(GameState::Menu)));
     }
 }
 

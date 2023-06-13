@@ -6,14 +6,14 @@ pub struct PlayersPlugin;
 
 impl Plugin for PlayersPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_update(GameState::InGame)
-                .with_system(camera_follow)
-                .with_system(animate_sprites),
-        );
+        app.add_systems((
+            camera_follow.run_if(in_state(GameState::InGame)),
+            animate_sprites.run_if(in_state(GameState::InGame)),
+        ));
     }
 }
 
+#[derive(Resource)]
 pub struct LocalPlayerId(pub usize);
 
 #[derive(Component)]

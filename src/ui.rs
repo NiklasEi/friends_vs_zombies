@@ -7,31 +7,27 @@ use crate::{GameMode, GameState, Score};
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
 use bevy::render::camera::RenderTarget;
+use bevy::window::{PrimaryWindow, WindowRef};
 
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_enter(GameState::Matchmaking)
-                .with_system(spawn_player_list)
-                .with_system(prepare_matchmaking_ui),
+        app.add_systems(
+            (spawn_player_list, prepare_matchmaking_ui)
+                .in_schedule(OnEnter(GameState::Matchmaking)),
         )
-        .add_system_set(
-            SystemSet::on_update(GameState::Matchmaking)
-                .with_system(update_player_list)
-                .with_system(click_start_button),
-        )
-        .add_system_set(SystemSet::on_exit(GameState::Matchmaking).with_system(prepare_game_ui))
-        .add_system_set(
-            SystemSet::on_update(GameState::InGame)
-                .with_system(update_health_bars)
-                .with_system(update_score)
-                .with_system(move_player_markers),
-        )
-        .add_system_set(
-            SystemSet::on_exit(GameState::Matchmaking).with_system(remove_matchmaking_only_ui),
-        );
+        .add_systems((
+            update_player_list.run_if(in_state(GameState::Matchmaking)),
+            click_start_button.run_if(in_state(GameState::Matchmaking)),
+        ))
+        .add_system(prepare_game_ui.in_schedule(OnExit(GameState::Matchmaking)))
+        .add_systems((
+            update_health_bars.run_if(in_state(GameState::InGame)),
+            update_score.run_if(in_state(GameState::InGame)),
+            move_player_markers.run_if(in_state(GameState::InGame)),
+        ))
+        .add_system(remove_matchmaking_only_ui.in_schedule(OnExit(GameState::Matchmaking)));
     }
 }
 
@@ -40,7 +36,7 @@ struct PlayerList;
 
 fn spawn_player_list(mut commands: Commands) {
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
                 position_type: PositionType::Absolute,
                 size: Size {
@@ -51,22 +47,18 @@ fn spawn_player_list(mut commands: Commands) {
                 align_items: AlignItems::Center,
                 ..Default::default()
             },
-            color: UiColor(Color::NONE),
+            background_color: BackgroundColor(Color::NONE),
             ..default()
         })
         .with_children(|parent| {
             parent
-                .spawn_bundle(TextBundle {
+                .spawn(TextBundle {
                     style: Style {
                         margin: UiRect {
                             left: Val::Px(5.),
                             ..default()
                         },
                         ..default()
-                    },
-                    text: Text {
-                        sections: vec![],
-                        alignment: Default::default(),
                     },
                     ..Default::default()
                 })
@@ -92,7 +84,7 @@ fn prepare_matchmaking_ui(
     button_colors: Res<ButtonColors>,
 ) {
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
                 size: Size {
                     width: Val::Percent(100.),
@@ -103,13 +95,13 @@ fn prepare_matchmaking_ui(
                 align_items: AlignItems::Center,
                 ..default()
             },
-            color: UiColor(Color::NONE),
+            background_color: BackgroundColor(Color::NONE),
             ..default()
         })
         .insert(RootNode)
         .with_children(|parent| {
             if *game_mode == GameMode::Multi(true) {
-                parent.spawn_bundle(TextBundle {
+                parent.spawn(TextBundle {
                     text: Text {
                         sections: vec![TextSection {
                             value:
@@ -121,12 +113,13 @@ fn prepare_matchmaking_ui(
                                 color: Color::rgb(0.9, 0.9, 0.9),
                             },
                         }],
-                        alignment: TextAlignment::CENTER,
+                        alignment: TextAlignment::Center,
+                        ..default()
                     },
                     ..Default::default()
                 }).insert(MatchmakingOnly);
                 parent
-                    .spawn_bundle(ButtonBundle {
+                    .spawn(ButtonBundle {
                         style: Style {
                             size: Size::new(Val::Px(120.0), Val::Px(50.0)),
                             margin: UiRect::all(Val::Auto),
@@ -134,13 +127,13 @@ fn prepare_matchmaking_ui(
                             align_items: AlignItems::Center,
                             ..Default::default()
                         },
-                        color: button_colors.normal,
+                        background_color: button_colors.normal.into(),
                         ..Default::default()
                     })
                     .insert(StartButton)
                     .insert(MatchmakingOnly)
                     .with_children(|parent| {
-                        parent.spawn_bundle(TextBundle {
+                        parent.spawn(TextBundle {
                             text: Text {
                                 sections: vec![TextSection {
                                     value: "Start".to_string(),
@@ -150,26 +143,27 @@ fn prepare_matchmaking_ui(
                                         color: Color::rgb(0.9, 0.9, 0.9),
                                     },
                                 }],
-                                alignment: TextAlignment::CENTER,
+                                alignment: TextAlignment::Center,
+                                ..default()
                             },
                             ..Default::default()
                         });
                     });
             } else if *game_mode == GameMode::Multi(false) {
                 parent
-                    .spawn_bundle(NodeBundle {
+                    .spawn(NodeBundle {
                         style: Style {
                             margin: UiRect::all(Val::Auto),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
                             ..Default::default()
                         },
-                        color: UiColor(Color::NONE),
+                        background_color: BackgroundColor(Color::NONE),
                         ..Default::default()
                     })
                     .insert(MatchmakingOnly)
                     .with_children(|parent| {
-                        parent.spawn_bundle(TextBundle {
+                        parent.spawn(TextBundle {
                             text: Text {
                                 sections: vec![TextSection {
                                     value:
@@ -181,15 +175,16 @@ fn prepare_matchmaking_ui(
                                         color: Color::rgb(0.9, 0.9, 0.9),
                                     },
                                 }],
-                                alignment: TextAlignment::CENTER,
+                                alignment: TextAlignment::Center,
+                                ..default()
                             },
                             ..Default::default()
                         });
                     });
             }
 
-            parent.spawn_bundle(ImageBundle {
-                image: UiImage(image_assets.control.clone()),
+            parent.spawn(ImageBundle {
+                image: UiImage::new(image_assets.control.clone()),
                 transform: Transform {
                     scale: Vec3::splat(0.5),
                     ..default()
@@ -198,7 +193,7 @@ fn prepare_matchmaking_ui(
             }).insert(MatchmakingOnly);
 
             parent
-                .spawn_bundle(TextBundle {
+                .spawn(TextBundle {
                     style: Style {
                         position_type: PositionType::Absolute,
                         position: UiRect {
@@ -217,7 +212,8 @@ fn prepare_matchmaking_ui(
                                 color: Color::rgb(0.9, 0.9, 0.9),
                             },
                         }],
-                        alignment: TextAlignment::CENTER,
+                        alignment: TextAlignment::Center,
+                        ..default()
                     },
                     ..Default::default()
                 })
@@ -230,7 +226,7 @@ struct ScoreText;
 
 fn prepare_game_ui(mut commands: Commands, font_assets: Res<FontAssets>) {
     commands
-        .spawn_bundle(TextBundle {
+        .spawn(TextBundle {
             style: Style {
                 position_type: PositionType::Absolute,
                 position: UiRect {
@@ -249,7 +245,8 @@ fn prepare_game_ui(mut commands: Commands, font_assets: Res<FontAssets>) {
                         color: Color::rgb(0.9, 0.9, 0.9),
                     },
                 }],
-                alignment: TextAlignment::CENTER,
+                alignment: TextAlignment::Center,
+                ..default()
             },
             ..Default::default()
         })
@@ -275,7 +272,7 @@ fn click_start_button(
     button_colors: Res<ButtonColors>,
     mut start_game: ResMut<StartGame>,
     mut interaction_query: Query<
-        (&Interaction, &mut UiColor),
+        (&Interaction, &mut BackgroundColor),
         (Changed<Interaction>, With<StartButton>),
     >,
 ) {
@@ -286,13 +283,13 @@ fn click_start_button(
         match *interaction {
             Interaction::Clicked => {
                 start_game.0 = true;
-                *color = button_colors.selected;
+                *color = button_colors.selected.into();
             }
             Interaction::Hovered => {
-                *color = button_colors.hovered;
+                *color = button_colors.hovered.into();
             }
             Interaction::None => {
-                *color = button_colors.normal;
+                *color = button_colors.normal.into();
             }
         }
     }
@@ -342,15 +339,16 @@ fn move_player_markers(
         &mut Handle<Image>,
     )>,
     dead: Query<&Dead>,
-    windows: Res<Windows>,
+    windows: Query<&Window>,
+    primary_window: Query<&Window, With<PrimaryWindow>>,
     images: Res<PlayerAssets>,
     camera: Query<(&Camera, &Transform), (Without<Player>, Without<PlayerMarker>)>,
 ) {
     let (camera, center) = camera.single();
-    let window = if let RenderTarget::Window(id) = camera.target {
+    let window = if let RenderTarget::Window(WindowRef::Entity(id)) = camera.target {
         windows.get(id).unwrap()
     } else {
-        windows.get_primary().unwrap()
+        primary_window.single()
     };
 
     let width = 10.;
@@ -363,7 +361,7 @@ fn move_player_markers(
         if (center.translation.x - player_transform.translation.x).abs() < width
             && (center.translation.y - player_transform.translation.y).abs() < height
         {
-            visibility.is_visible = false;
+            *visibility = Visibility::Hidden;
             continue;
         }
         if dead.contains(player_entity) {
@@ -371,7 +369,7 @@ fn move_player_markers(
         } else {
             *image = images.marker.clone();
         }
-        visibility.is_visible = true;
+        *visibility = Visibility::Visible;
         let centered_position = (player_transform.translation.clone() - center.translation).xy();
         let angle = centered_position.angle_between(Vec2::X);
         marker_transform.rotation = Quat::from_rotation_z(-angle);

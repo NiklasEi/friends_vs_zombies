@@ -18,22 +18,22 @@ impl Plugin for LoadingPlugin {
                 "my-assets",
             ]))
             .add_loading_state(
-                LoadingState::new(GameState::AssetLoading)
-                    .with_dynamic_collections::<CustomDynamicAssetCollection>(vec![
-                        "enemies.my-assets",
-                    ])
-                    .with_collection::<ImageAssets>()
-                    .with_collection::<FontAssets>()
-                    .with_collection::<GameData>()
-                    .with_collection::<PlayerAssets>()
-                    .with_collection::<EnemyAssets>()
-                    .with_collection::<AudioAssets>()
-                    .continue_to_state(GameState::Menu),
+                LoadingState::new(GameState::AssetLoading).continue_to_state(GameState::Menu),
+            )
+            .add_collection_to_loading_state::<_, ImageAssets>(GameState::AssetLoading)
+            .add_collection_to_loading_state::<_, FontAssets>(GameState::AssetLoading)
+            .add_collection_to_loading_state::<_, GameData>(GameState::AssetLoading)
+            .add_collection_to_loading_state::<_, PlayerAssets>(GameState::AssetLoading)
+            .add_collection_to_loading_state::<_, EnemyAssets>(GameState::AssetLoading)
+            .add_collection_to_loading_state::<_, AudioAssets>(GameState::AssetLoading)
+            .add_dynamic_collection_to_loading_state::<_, CustomDynamicAssetCollection>(
+                GameState::AssetLoading,
+                "enemies.my-assets",
             );
     }
 }
 
-#[derive(AssetCollection)]
+#[derive(AssetCollection, Resource)]
 pub struct AudioAssets {
     #[asset(path = "audio/background.ogg")]
     pub background: Handle<AudioSource>,
@@ -51,13 +51,13 @@ pub struct AudioAssets {
     pub revive: Handle<AudioSource>,
 }
 
-#[derive(AssetCollection)]
+#[derive(AssetCollection, Resource)]
 pub struct GameData {
     #[asset(path = "player.names")]
     pub player_names: Handle<PlayerNames>,
 }
 
-#[derive(AssetCollection)]
+#[derive(AssetCollection, Resource)]
 pub struct ImageAssets {
     #[asset(path = "bullet.png")]
     pub bullet: Handle<Image>,
@@ -68,7 +68,7 @@ pub struct ImageAssets {
     pub grass: Handle<TextureAtlas>,
 }
 
-#[derive(AssetCollection)]
+#[derive(AssetCollection, Resource)]
 pub struct PlayerAssets {
     #[asset(path = "players/marker.png")]
     pub marker: Handle<Image>,
@@ -124,7 +124,7 @@ impl PlayerAssets {
     }
 }
 
-#[derive(AssetCollection)]
+#[derive(AssetCollection, Resource)]
 pub struct EnemyAssets {
     #[asset(key = "devil")]
     pub devil: Handle<EnemyData>,
@@ -142,7 +142,7 @@ impl EnemyAssets {
     }
 }
 
-#[derive(AssetCollection)]
+#[derive(AssetCollection, Resource)]
 pub struct FontAssets {
     #[asset(path = "fonts/FiraSans-Bold.ttf")]
     pub fira_sans: Handle<Font>,
@@ -219,6 +219,8 @@ impl DynamicAsset for CustomDynamicAsset {
                     Vec2::splat(96.),
                     4,
                     1,
+                    None,
+                    None,
                 );
 
                 Ok(DynamicAssetType::Single(

@@ -10,30 +10,32 @@ impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ButtonColors>()
             .insert_resource(GameCode("".to_owned()))
-            .add_system_set(SystemSet::on_enter(GameState::Menu).with_system(setup_menu))
-            .add_system_set(
-                SystemSet::on_update(GameState::Menu)
-                    .with_system(click_singleplayer_button)
-                    .with_system(click_create_game_button)
-                    .with_system(listen_for_game_code)
-                    .with_system(click_join_game_button.after(listen_for_game_code)),
-            )
-            .add_system_set(SystemSet::on_exit(GameState::Menu).with_system(cleanup_menu));
+            .add_system(setup_menu.in_schedule(OnEnter(GameState::Menu)))
+            .add_systems((
+                click_singleplayer_button.run_if(in_state(GameState::Menu)),
+                click_create_game_button.run_if(in_state(GameState::Menu)),
+                listen_for_game_code.run_if(in_state(GameState::Menu)),
+                click_join_game_button
+                    .after(listen_for_game_code)
+                    .run_if(in_state(GameState::Menu)),
+            ))
+            .add_system(cleanup_menu.in_schedule(OnExit(GameState::Menu)));
     }
 }
 
+#[derive(Resource)]
 pub struct ButtonColors {
-    pub normal: UiColor,
-    pub hovered: UiColor,
-    pub selected: UiColor,
+    pub normal: Color,
+    pub hovered: Color,
+    pub selected: Color,
 }
 
 impl Default for ButtonColors {
     fn default() -> Self {
         ButtonColors {
-            normal: Color::rgb(0.15, 0.15, 0.15).into(),
-            hovered: Color::rgb(0.25, 0.25, 0.25).into(),
-            selected: Color::rgb(0.55, 0.55, 0.55).into(),
+            normal: Color::rgb(0.15, 0.15, 0.15),
+            hovered: Color::rgb(0.25, 0.25, 0.25),
+            selected: Color::rgb(0.55, 0.55, 0.55),
         }
     }
 }
@@ -53,6 +55,7 @@ struct MenuUi;
 #[derive(Component)]
 struct CodeDisplay;
 
+#[derive(Resource)]
 pub struct GameCode(pub(crate) String);
 
 fn setup_menu(
@@ -62,9 +65,9 @@ fn setup_menu(
 ) {
     let mut camera_bundle = Camera2dBundle::default();
     camera_bundle.projection.scaling_mode = ScalingMode::FixedVertical(10.);
-    commands.spawn_bundle(camera_bundle);
+    commands.spawn(camera_bundle);
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
                 size: Size {
                     width: Val::Percent(100.),
@@ -73,13 +76,13 @@ fn setup_menu(
                 flex_direction: FlexDirection::ColumnReverse,
                 ..default()
             },
-            color: UiColor(Color::NONE),
+            background_color: BackgroundColor(Color::NONE),
             ..default()
         })
         .insert(MenuUi)
         .with_children(|parent| {
             parent
-                .spawn_bundle(ButtonBundle {
+                .spawn(ButtonBundle {
                     style: Style {
                         size: Size::new(Val::Px(250.0), Val::Px(50.0)),
                         margin: UiRect {
@@ -90,12 +93,12 @@ fn setup_menu(
                         align_items: AlignItems::Center,
                         ..Default::default()
                     },
-                    color: button_colors.normal,
+                    background_color: BackgroundColor(button_colors.normal),
                     ..Default::default()
                 })
                 .insert(SingleplayerButton)
                 .with_children(|parent| {
-                    parent.spawn_bundle(TextBundle {
+                    parent.spawn(TextBundle {
                         text: Text {
                             sections: vec![TextSection {
                                 value: "Play alone".to_string(),
@@ -105,14 +108,15 @@ fn setup_menu(
                                     color: Color::rgb(0.9, 0.9, 0.9),
                                 },
                             }],
-                            alignment: TextAlignment::CENTER,
+                            alignment: TextAlignment::Center,
+                            ..default()
                         },
                         ..Default::default()
                     });
                 });
 
             parent
-                .spawn_bundle(NodeBundle {
+                .spawn(NodeBundle {
                     style: Style {
                         size: Size::new(Val::Px(250.0), Val::Px(50.0)),
                         margin: UiRect::all(Val::Auto),
@@ -120,11 +124,11 @@ fn setup_menu(
                         align_items: AlignItems::Center,
                         ..Default::default()
                     },
-                    color: UiColor(Color::NONE),
+                    background_color: BackgroundColor(Color::NONE),
                     ..Default::default()
                 })
                 .with_children(|parent| {
-                    parent.spawn_bundle(TextBundle {
+                    parent.spawn(TextBundle {
                         text: Text {
                             sections: vec![TextSection {
                                 value: "Multiplayer".to_string(),
@@ -134,13 +138,14 @@ fn setup_menu(
                                     color: Color::rgb(0.9, 0.9, 0.9),
                                 },
                             }],
-                            alignment: TextAlignment::CENTER,
+                            alignment: TextAlignment::Center,
+                            ..default()
                         },
                         ..Default::default()
                     });
                 });
             parent
-                .spawn_bundle(ButtonBundle {
+                .spawn(ButtonBundle {
                     style: Style {
                         size: Size::new(Val::Px(250.0), Val::Px(50.0)),
                         margin: UiRect::all(Val::Auto),
@@ -148,12 +153,12 @@ fn setup_menu(
                         align_items: AlignItems::Center,
                         ..Default::default()
                     },
-                    color: button_colors.normal,
+                    background_color: button_colors.normal.into(),
                     ..Default::default()
                 })
                 .insert(CreateGameButton)
                 .with_children(|parent| {
-                    parent.spawn_bundle(TextBundle {
+                    parent.spawn(TextBundle {
                         text: Text {
                             sections: vec![TextSection {
                                 value: "New Game".to_string(),
@@ -163,13 +168,14 @@ fn setup_menu(
                                     color: Color::rgb(0.9, 0.9, 0.9),
                                 },
                             }],
-                            alignment: TextAlignment::CENTER,
+                            alignment: TextAlignment::Center,
+                            ..default()
                         },
                         ..Default::default()
                     });
                 });
             parent
-                .spawn_bundle(NodeBundle {
+                .spawn(NodeBundle {
                     style: Style {
                         size: Size::new(Val::Px(250.0), Val::Px(50.0)),
                         margin: UiRect::all(Val::Auto),
@@ -177,12 +183,12 @@ fn setup_menu(
                         align_items: AlignItems::Center,
                         ..Default::default()
                     },
-                    color: UiColor(Color::NONE),
+                    background_color: BackgroundColor(Color::NONE),
                     ..Default::default()
                 })
                 .with_children(|parent| {
                     parent
-                        .spawn_bundle(TextBundle {
+                        .spawn(TextBundle {
                             text: Text {
                                 sections: vec![TextSection {
                                     value: "Code: ______".to_owned(),
@@ -192,14 +198,15 @@ fn setup_menu(
                                         color: Color::rgb(0.9, 0.9, 0.9),
                                     },
                                 }],
-                                alignment: TextAlignment::CENTER,
+                                alignment: TextAlignment::Center,
+                                ..default()
                             },
                             ..Default::default()
                         })
                         .insert(CodeDisplay);
                 });
             parent
-                .spawn_bundle(ButtonBundle {
+                .spawn(ButtonBundle {
                     style: Style {
                         size: Size::new(Val::Px(250.0), Val::Px(50.0)),
                         margin: UiRect::all(Val::Auto),
@@ -207,12 +214,12 @@ fn setup_menu(
                         align_items: AlignItems::Center,
                         ..Default::default()
                     },
-                    color: button_colors.selected,
+                    background_color: button_colors.selected.into(),
                     ..Default::default()
                 })
                 .insert(JoinGameButton)
                 .with_children(|parent| {
-                    parent.spawn_bundle(TextBundle {
+                    parent.spawn(TextBundle {
                         text: Text {
                             sections: vec![TextSection {
                                 value: "Join Game".to_string(),
@@ -222,7 +229,8 @@ fn setup_menu(
                                     color: Color::rgb(0.9, 0.9, 0.9),
                                 },
                             }],
-                            alignment: TextAlignment::CENTER,
+                            alignment: TextAlignment::Center,
+                            ..default()
                         },
                         ..Default::default()
                     });
@@ -233,24 +241,24 @@ fn setup_menu(
 fn click_singleplayer_button(
     mut commands: Commands,
     button_colors: Res<ButtonColors>,
-    mut state: ResMut<State<GameState>>,
+    mut state: ResMut<NextState<GameState>>,
     mut interaction_query: Query<
-        (&Interaction, &mut UiColor),
+        (&Interaction, &mut BackgroundColor),
         (Changed<Interaction>, With<SingleplayerButton>),
     >,
 ) {
     for (interaction, mut color) in &mut interaction_query {
         match *interaction {
             Interaction::Clicked => {
-                state.set(GameState::Matchmaking).unwrap();
+                state.set(GameState::Connect);
                 commands.insert_resource(GameMode::Single);
                 commands.insert_resource(GameCode(build_game_code()));
             }
             Interaction::Hovered => {
-                *color = button_colors.hovered;
+                *color = button_colors.hovered.into();
             }
             Interaction::None => {
-                *color = button_colors.normal;
+                *color = button_colors.normal.into();
             }
         }
     }
@@ -259,24 +267,24 @@ fn click_singleplayer_button(
 fn click_create_game_button(
     mut commands: Commands,
     button_colors: Res<ButtonColors>,
-    mut state: ResMut<State<GameState>>,
+    mut state: ResMut<NextState<GameState>>,
     mut interaction_query: Query<
-        (&Interaction, &mut UiColor),
+        (&Interaction, &mut BackgroundColor),
         (Changed<Interaction>, With<CreateGameButton>),
     >,
 ) {
     for (interaction, mut color) in &mut interaction_query {
         match *interaction {
             Interaction::Clicked => {
-                state.set(GameState::Matchmaking).unwrap();
+                state.set(GameState::Connect);
                 commands.insert_resource(GameMode::Multi(true));
                 commands.insert_resource(GameCode(build_game_code()));
             }
             Interaction::Hovered => {
-                *color = button_colors.hovered;
+                *color = button_colors.hovered.into();
             }
             Interaction::None => {
-                *color = button_colors.normal;
+                *color = button_colors.normal.into();
             }
         }
     }
@@ -326,7 +334,7 @@ fn listen_for_game_code(
     input: Res<Input<KeyCode>>,
     mut game_code: ResMut<GameCode>,
     button_colors: Res<ButtonColors>,
-    mut join_button: Query<&mut UiColor, With<JoinGameButton>>,
+    mut join_button: Query<&mut BackgroundColor, With<JoinGameButton>>,
 ) {
     if input.just_pressed(KeyCode::Back) {
         game_code.0.pop();
@@ -341,7 +349,7 @@ fn listen_for_game_code(
     code.single_mut().sections[0].value =
         format!("Code: {}{}", game_code.0, "_".repeat(6 - game_code.0.len()));
     if game_code.0.len() == 6 {
-        *join_button.single_mut() = button_colors.normal;
+        *join_button.single_mut() = button_colors.normal.into();
     }
 }
 
@@ -349,29 +357,29 @@ fn click_join_game_button(
     mut commands: Commands,
     button_colors: Res<ButtonColors>,
     game_code: Res<GameCode>,
-    mut state: ResMut<State<GameState>>,
+    mut state: ResMut<NextState<GameState>>,
     input: Res<Input<KeyCode>>,
-    mut interaction_query: Query<(&Interaction, &mut UiColor), With<JoinGameButton>>,
+    mut interaction_query: Query<(&Interaction, &mut BackgroundColor), With<JoinGameButton>>,
 ) {
     if game_code.0.len() < 6 {
         return;
     }
     if input.just_pressed(KeyCode::Return) {
-        state.set(GameState::Matchmaking).unwrap();
+        state.set(GameState::Connect);
         commands.insert_resource(GameMode::Multi(false));
         return;
     }
     for (interaction, mut color) in &mut interaction_query {
         match *interaction {
             Interaction::Clicked => {
-                state.set(GameState::Matchmaking).unwrap();
+                state.set(GameState::Connect);
                 commands.insert_resource(GameMode::Multi(false));
             }
             Interaction::Hovered => {
-                *color = button_colors.hovered;
+                *color = button_colors.hovered.into();
             }
             Interaction::None => {
-                *color = button_colors.normal;
+                *color = button_colors.normal.into();
             }
         }
     }

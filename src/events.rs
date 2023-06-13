@@ -9,11 +9,11 @@ pub struct EventsPlugin;
 impl Plugin for EventsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SafeEventsCache>()
-            .add_system_set(SystemSet::on_update(GameState::InGame).with_system(propagate));
+            .add_system(propagate.run_if(in_state(GameState::InGame)));
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub struct SafeEventsCache(HashMap<u32, SafeEvent>);
 
 pub fn propagate(

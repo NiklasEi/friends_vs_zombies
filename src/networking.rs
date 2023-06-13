@@ -10,11 +10,12 @@ use crate::{
 };
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
-use bevy_ggrs::{GGRSPlugin, Rollback, RollbackIdProvider};
-use ggrs::{InputStatus, P2PSession};
+use bevy_ggrs::{GGRSPlugin, GGRSSchedule, PlayerInputs, Rollback, RollbackIdProvider, Session};
+use matchbox_socket::PeerId;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::f32::consts::PI;
+use std::ops::Deref;
 use std::time::Duration;
 
 pub struct NetworkingPlugin;
@@ -25,55 +26,36 @@ impl Plugin for NetworkingPlugin {
             .init_resource::<SeedFrame>();
         GGRSPlugin::<GgrsConfig>::new()
             .with_input_system(game_input)
-            .with_rollback_schedule(
-                Schedule::default().with_stage(
-                    "ROLLBACK_STAGE",
-                    SystemStage::single_threaded()
-                        .with_system_set(State::<GameState>::get_driver())
-                        .with_system_set(
-                            SystemSet::on_enter(GameState::Interlude)
-                                .with_system(reset_interlude_timer),
-                        )
-                        .with_system_set(
-                            SystemSet::on_exit(GameState::Interlude)
-                                .with_system(remove_entities)
-                                .with_system(reset_score),
-                        )
-                        .with_system_set(
-                            SystemSet::on_update(GameState::Interlude).with_system(interlude_timer),
-                        )
-                        .with_system_set(
-                            SystemSet::on_enter(GameState::InGame).with_system(spawn_players),
-                        )
-                        .with_system_set(
-                            SystemSet::on_update(GameState::InGame)
-                                .with_system(advance_seed_frame)
-                                .with_system(spawn_enemies.after(advance_seed_frame))
-                                .with_system(move_players.after(advance_seed_frame))
-                                .with_system(move_bullet.after(advance_seed_frame))
-                                .with_system(kill_enemies.after(move_bullet))
-                                .with_system(fire_bullets.after(move_players))
-                                .with_system(move_enemies.after(move_players))
-                                .with_system(
-                                    bullets_hitting_players
-                                        .after(kill_enemies)
-                                        .after(move_players),
-                                )
-                                .with_system(kill_players.after(bullets_hitting_players))
-                                .with_system(revive_players.after(kill_players))
-                                .with_system(end_game.after(revive_players)),
-                        ),
-                ),
-            )
-            .register_rollback_type::<Transform>()
-            .register_rollback_type::<SeedFrame>()
-            .register_rollback_type::<Weapon>()
-            .register_rollback_type::<Bullet>()
-            .register_rollback_type::<MoveDir>()
-            .register_rollback_type::<EnemyTimer>()
-            .register_rollback_type::<Dead>()
-            .register_rollback_type::<PlayerMarker>()
+            .register_rollback_resource::<SeedFrame>()
+            .register_rollback_component::<Transform>()
+            .register_rollback_component::<Weapon>()
+            .register_rollback_component::<Bullet>()
+            .register_rollback_component::<MoveDir>()
+            .register_rollback_component::<EnemyTimer>()
+            .register_rollback_component::<Dead>()
+            .register_rollback_component::<PlayerMarker>()
             .build(app);
+        app.add_system(reset_interlude_timer.in_schedule(OnEnter(GameState::Interlude)))
+            .add_systems((remove_entities, reset_score).in_schedule(OnExit(GameState::Interlude)))
+            .add_system(interlude_timer.run_if(in_state(GameState::Interlude)))
+            .add_system(spawn_players.in_schedule(OnEnter(GameState::InGame)))
+            .add_systems(
+                (
+                    advance_seed_frame.run_if(in_state(GameState::InGame)),
+                    spawn_enemies.run_if(in_state(GameState::InGame)),
+                    move_players.run_if(in_state(GameState::InGame)),
+                    move_bullet.run_if(in_state(GameState::InGame)),
+                    move_enemies.run_if(in_state(GameState::InGame)),
+                    fire_bullets.run_if(in_state(GameState::InGame)),
+                    kill_enemies.run_if(in_state(GameState::InGame)),
+                    bullets_hitting_players.run_if(in_state(GameState::InGame)),
+                    kill_players.run_if(in_state(GameState::InGame)),
+                    revive_players.run_if(in_state(GameState::InGame)),
+                    end_game.run_if(in_state(GameState::InGame)),
+                )
+                    .chain()
+                    .in_schedule(GGRSSchedule),
+            );
     }
 }
 
@@ -83,20 +65,19 @@ impl ggrs::Config for GgrsConfig {
     // 4-directions + fire fits easily in a single byte
     type Input = u8;
     type State = u8;
-    // Matchbox' WebRtcSocket addresses are strings
-    type Address = String;
+    type Address = PeerId;
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub struct InterludeTimer(pub usize);
 
 fn reset_interlude_timer(mut timer: ResMut<InterludeTimer>) {
     timer.0 = 60 * 3;
 }
 
-fn interlude_timer(mut timer: ResMut<InterludeTimer>, mut state: ResMut<State<GameState>>) {
+fn interlude_timer(mut timer: ResMut<InterludeTimer>, mut state: ResMut<NextState<GameState>>) {
     if timer.0 == 0 {
-        state.set(GameState::InGame).unwrap();
+        state.set(GameState::InGame);
     } else {
         timer.0 -= 1;
     }
@@ -112,10 +93,13 @@ pub fn spawn_players(
     mut commands: Commands,
     mut rollback_id_provider: ResMut<RollbackIdProvider>,
     player_assets: Res<PlayerAssets>,
-    session: Res<P2PSession<GgrsConfig>>,
+    session: Res<Session<GgrsConfig>>,
 ) {
+    let Session::P2PSession(session) = session.deref() else {
+        panic!("wrong session type");
+    };
     for player in 0..session.num_players() {
-        let mut player_commands = commands.spawn_bundle(SpriteSheetBundle {
+        let mut player_commands = commands.spawn(SpriteSheetBundle {
             transform: Transform {
                 translation: Vec3::new(0., 0., 100.),
                 scale: Vec3::splat(0.01),
@@ -128,7 +112,10 @@ pub fn spawn_players(
         let player_id = player_commands.id();
 
         player_commands
-            .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
+            .insert(AnimationTimer(
+                Timer::from_seconds(0.1, TimerMode::Repeating),
+                4,
+            ))
             .insert(Player { handle: player })
             .insert(Weapon::new())
             .insert(MoveDir(-Vec2::X))
@@ -136,13 +123,13 @@ pub fn spawn_players(
             .insert(Rollback::new(rollback_id_provider.next_id()))
             .with_children(|parent| {
                 parent
-                    .spawn_bundle(SpatialBundle {
+                    .spawn(SpatialBundle {
                         transform: Transform::from_translation(Vec3::new(0., 50., 0.)),
                         ..default()
                     })
                     .insert(HealthBarParent)
                     .with_children(|parent| {
-                        parent.spawn_bundle(SpriteBundle {
+                        parent.spawn(SpriteBundle {
                             sprite: Sprite {
                                 color: Color::DARK_GRAY,
                                 custom_size: Some(Vec2::new(100., 5.1)),
@@ -152,7 +139,7 @@ pub fn spawn_players(
                             ..default()
                         });
                         parent
-                            .spawn_bundle(SpriteBundle {
+                            .spawn(SpriteBundle {
                                 sprite: Sprite {
                                     color: Color::RED,
                                     custom_size: Some(Vec2::new(100., 5.1)),
@@ -167,7 +154,7 @@ pub fn spawn_players(
 
         info!("spawn marker");
         commands
-            .spawn_bundle(SpriteBundle {
+            .spawn(SpriteBundle {
                 transform: {
                     let mut transform = Transform::from_translation(Vec3::new(0., 0., 101.));
                     transform.scale = Vec3::splat(0.01);
@@ -175,7 +162,7 @@ pub fn spawn_players(
                     transform
                 },
                 texture: player_assets.marker.clone(),
-                visibility: Visibility { is_visible: true },
+                visibility: Visibility::Visible,
                 ..default()
             })
             .insert(PlayerMarker(player_id));
@@ -188,7 +175,7 @@ fn reset_score(mut score: ResMut<Score>) {
 
 fn revive_players(
     mut commands: Commands,
-    inputs: Res<Vec<(u8, InputStatus)>>,
+    inputs: Res<PlayerInputs<GgrsConfig>>,
     mut dead_players: Query<(Entity, &mut Transform, &mut Health), (With<Dead>, With<Player>)>,
     alive_players: Query<(&Player, &Transform), Without<Dead>>,
     mut health_bars: Query<(&Parent, &mut Visibility), (With<HealthBarParent>, Without<Player>)>,
@@ -213,7 +200,7 @@ fn revive_players(
                 }
                 rollback_safe_events.0.push(SafeEvent::new(
                     FvzEvent::Revive,
-                    (5 * dead_player.id()).wrapping_add(player.handle as u32),
+                    (5 * dead_player.index()).wrapping_add(player.handle as u32),
                 ));
                 commands.entity(dead_player).remove::<Dead>();
                 dead_transform.rotation = Quat::from_rotation_z(0.);
@@ -222,7 +209,7 @@ fn revive_players(
                     .iter_mut()
                     .find(|(parent, _)| parent.get() == dead_player)
                 {
-                    visibility.is_visible = true;
+                    *visibility = Visibility::Visible;
                 }
             }
         }
@@ -231,14 +218,14 @@ fn revive_players(
 
 fn end_game(
     alive_players: Query<&Player, Without<Dead>>,
-    mut state: ResMut<State<GameState>>,
+    mut state: ResMut<NextState<GameState>>,
     mut rollback_safe_events: ResMut<RollbackSafeEvents>,
 ) {
     if alive_players.is_empty() {
         rollback_safe_events
             .0
             .push(SafeEvent::new(FvzEvent::Lost, 0));
-        state.set(GameState::Interlude).unwrap();
+        state.set(GameState::Interlude);
     }
 }
 
@@ -284,7 +271,7 @@ fn bullets_hitting_players(
             if distance < PLAYER_RADIUS + BULLET_RADIUS && bullet.hit(player) {
                 rollback_safe_events.0.push(SafeEvent::new(
                     FvzEvent::PlayerHitBullet,
-                    (3 * bullet_entity.id()).wrapping_add(player.id()),
+                    (3 * bullet_entity.index()).wrapping_add(player.index()),
                 ));
                 health.current -= bullet.damage;
                 if bullet.is_used_up() {
@@ -312,7 +299,7 @@ fn kill_players(
                 .iter_mut()
                 .find(|(parent, _)| parent.get() == player)
             {
-                visibility.is_visible = false;
+                *visibility = Visibility::Hidden;
             }
             player_transform.rotation = Quat::from_rotation_z(PI / 2.);
         }
@@ -323,7 +310,7 @@ fn kill_players(
 pub struct Dead;
 
 fn move_players(
-    inputs: Res<Vec<(u8, InputStatus)>>,
+    inputs: Res<PlayerInputs<GgrsConfig>>,
     mut player_query: Query<(
         Entity,
         &mut Transform,
@@ -369,15 +356,18 @@ fn advance_seed_frame(mut frame: ResMut<SeedFrame>) {
     frame.0 = frame.0.wrapping_add(1);
 }
 
-#[derive(Reflect, Component, Default)]
+#[derive(Reflect, Default, Resource)]
 pub struct SeedFrame(pub(crate) u32);
 
-#[derive(Reflect, Component)]
+#[derive(Reflect, Component, Resource)]
 struct EnemyTimer(Timer);
 
 impl Default for EnemyTimer {
     fn default() -> Self {
-        Self(Timer::new(Duration::from_secs_f32(5.), true))
+        Self(Timer::new(
+            Duration::from_secs_f32(5.),
+            TimerMode::Repeating,
+        ))
     }
 }
 
@@ -434,7 +424,7 @@ fn spawn_enemy(
     enemy_index: i32,
 ) {
     let enemy = enemy_data.get(enemy_assets.get(enemy_index)).unwrap();
-    let mut enemy_commands = commands.spawn_bundle(SpriteSheetBundle {
+    let mut enemy_commands = commands.spawn(SpriteSheetBundle {
         transform: Transform {
             translation,
             scale: Vec3::splat(0.01),
@@ -453,10 +443,13 @@ fn spawn_enemy(
             attack_cooldown: enemy.attack_cooldown as u32,
             last_attack: 0,
         })
-        .insert(AnimationTimer(Timer::from_seconds(0.1, true), 4))
+        .insert(AnimationTimer(
+            Timer::from_seconds(0.1, TimerMode::Repeating),
+            4,
+        ))
         .insert(Rollback::new(rollback_id_provider.next_id()))
         .with_children(|parent| {
-            parent.spawn_bundle(SpriteBundle {
+            parent.spawn(SpriteBundle {
                 sprite: Sprite {
                     color: Color::DARK_GRAY,
                     custom_size: Some(Vec2::new(100., 5.1)),
@@ -466,7 +459,7 @@ fn spawn_enemy(
                 ..default()
             });
             parent
-                .spawn_bundle(SpriteBundle {
+                .spawn(SpriteBundle {
                     sprite: Sprite {
                         color: Color::RED,
                         custom_size: Some(Vec2::new(100., 5.1)),
@@ -481,7 +474,7 @@ fn spawn_enemy(
 
 fn fire_bullets(
     mut commands: Commands,
-    inputs: Res<Vec<(u8, InputStatus)>>,
+    inputs: Res<PlayerInputs<GgrsConfig>>,
     images: Res<ImageAssets>,
     seed_frame: Res<SeedFrame>,
     mut player_query: Query<(Entity, &Transform, &Player, &mut Weapon, &MoveDir), Without<Dead>>,
@@ -493,10 +486,10 @@ fn fire_bullets(
         if input.is_fire() && weapon.shoot(&seed_frame) {
             rollback_safe_events.0.push(SafeEvent::new(
                 FvzEvent::Pew,
-                (2 * entity.id()).wrapping_add(seed_frame.0),
+                (2 * entity.index()).wrapping_add(seed_frame.0),
             ));
             commands
-                .spawn_bundle(SpriteBundle {
+                .spawn(SpriteBundle {
                     transform: Transform::from_translation(transform.translation.xy().extend(200.))
                         .with_rotation(Quat::from_rotation_arc_2d(Vec2::X, move_dir.0)),
                     texture: images.bullet.clone(),
